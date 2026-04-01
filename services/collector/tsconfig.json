@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@expenses/shared": ["../../packages/shared/src"]
+    }
+  },
+  "include": ["src"]
+}
