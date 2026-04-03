@@ -21,11 +21,12 @@ interface TransactionTableProps {
       note?: string;
     }
   ) => void;
+  onDelete: (transactionId: string) => void;
 }
 
 const toInputDate = (date: string) => new Date(date).toISOString().slice(0, 10);
 
-export const TransactionTable = ({ transactions, onUpdate }: TransactionTableProps) => {
+export const TransactionTable = ({ transactions, onUpdate, onDelete }: TransactionTableProps) => {
   const [selectedId, setSelectedId] = useState<string | null>(transactions[0]?.id ?? null);
   const selectedTransaction = transactions.find((transaction) => transaction.id === selectedId) ?? null;
   const [merchant, setMerchant] = useState("");
@@ -72,6 +73,23 @@ export const TransactionTable = ({ transactions, onUpdate }: TransactionTablePro
       date,
       note: note.trim() || undefined
     });
+  };
+
+  const handleDelete = () => {
+    if (!selectedTransaction) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedTransaction.merchant ?? "this transaction"} from the ledger?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    onDelete(selectedTransaction.id);
+    const nextTransaction = transactions.find((transaction) => transaction.id !== selectedTransaction.id) ?? null;
+    setSelectedId(nextTransaction?.id ?? null);
   };
 
   return (
@@ -185,7 +203,12 @@ export const TransactionTable = ({ transactions, onUpdate }: TransactionTablePro
                 <textarea rows={4} value={note} onChange={(event) => setNote(event.target.value)} />
               </label>
 
-              <button type="submit">Save edits</button>
+              <div className="editor-actions">
+                <button type="submit">Save edits</button>
+                <button type="button" className="danger-button" onClick={handleDelete}>
+                  Delete transaction
+                </button>
+              </div>
             </form>
           ) : (
             <div className="empty-box">No transaction selected yet.</div>

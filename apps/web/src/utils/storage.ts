@@ -1,13 +1,14 @@
 import type { Transaction } from "@expenses/shared";
 
-const STORAGE_KEY = "expenses-tracker-web-transactions";
+const buildStorageKey = (userId?: string) =>
+  `expenses-tracker-web-transactions${userId ? `:${userId}` : ""}`;
 
-export const loadTransactions = (): Transaction[] => {
+export const loadTransactions = (userId?: string): Transaction[] => {
   if (typeof window === "undefined") {
     return [];
   }
 
-  const value = window.localStorage.getItem(STORAGE_KEY);
+  const value = window.localStorage.getItem(buildStorageKey(userId));
   if (!value) {
     return [];
   }
@@ -19,10 +20,10 @@ export const loadTransactions = (): Transaction[] => {
   }
 };
 
-export const saveTransactions = (transactions: Transaction[]) => {
+export const saveTransactions = (transactions: Transaction[], userId?: string) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+  window.localStorage.setItem(buildStorageKey(userId), JSON.stringify(transactions));
 };

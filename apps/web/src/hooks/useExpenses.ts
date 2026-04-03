@@ -3,19 +3,25 @@ import {
   buildDashboardSummary,
   formatCurrency,
   normalizeMerchant,
-  type ImportJob,
   type ExpenseCategory,
   type PaymentMethod,
   type Transaction
 } from "@expenses/shared";
-import { mockImportJobs, mockTransactions } from "../services/mockData";
+import { useAuth } from "../auth/AuthContext";
 import {
   createExpense,
+  createCredit,
+  createReceivable,
+  deleteTransactionById,
   fetchExpenses,
+  fetchCredits,
+  fetchReceivables,
+  markReceivableReceived,
   updateExpenseById,
   type CreateExpensePayload,
   type UpdateExpensePayload
 } from "../services/expensesApi";
+import { ApiError } from "../services/api";
 import { loadTransactions, saveTransactions } from "../utils/storage";
 import type { DashboardFilters } from "../components/FiltersBar";
 
@@ -45,52 +51,103 @@ const matchesDateWindow = (transaction: Transaction, dateWindow: DashboardFilter
 };
 
 export const useExpenses = () => {
+  const { user, logout } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const persistedTransactions = loadTransactions();
-    return persistedTransactions.length > 0 ? persistedTransactions : mockTransactions;
+    return loadTransactions(user?.id);
   });
   const [filters, setFilters] = useState<DashboardFilters>(defaultFilters);
-  const [importJobs] = useState<ImportJob[]>(mockImportJobs);
   const [apiStatus, setApiStatus] = useState<"connecting" | "online" | "offline">("connecting");
   const [apiMessage, setApiMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    saveTransactions(transactions);
-  }, [transactions]);
+    saveTransactions(transactions, user?.id);
+  }, [transactions, user?.id]);
+
+  useEffect(() => {
+    setTransactions(loadTransactions(user?.id));
+  }, [user?.id]);
 
   useEffect(() => {
     let cancelled = false;
 
     const syncTransactions = async () => {
       try {
-        const remoteTransactions = await fetchExpenses();
+        const [remoteExpenses, remoteCredits, remoteReceivables] = await Promise.all([
+          fetchExpenses(),
+          fetchCredits(),
+          fetchReceivables()
+        ]);
         if (cancelled) {
           return;
         }
 
         setTransactions((currentTransactions) => {
           const localTransactionMap = new Map(currentTransactions.map((transaction) => [transaction.id, transaction]));
+          const receivablesByExpenseId = new Map(
+            remoteReceivables
+              .filter((receivable) => receivable.expenseId)
+              .map((receivable) => [receivable.expenseId!, receivable])
+          );
+
+          const mergeReceivable = (transaction: Transaction) => {
+            const receivable = receivablesByExpenseId.get(transaction.id);
+            if (!receivable) {
+              return transaction;
+            }
+
+            return {
+              ...transaction,
+              recoveryReminder: {
+                status: receivable.status,
+                dueDate: receivable.remindAt,
+                reminderDays: Math.max(
+                  1,
+                  Math.round(
+                    (new Date(receivable.remindAt).getTime() -
+                      new Date(transaction.date).getTime()) /
+                      (1000 * 60 * 60 * 24)
+                  )
+                ),
+                createdAt: receivable.createdAt,
+                collectionCreditId: receivable.receivedTransactionId,
+                collectedAt: receivable.receivedAt
+              }
+            };
+          };
 
           return [
-            ...currentTransactions.filter((transaction) => transaction.direction === "credit"),
-            ...remoteTransactions.map((transaction) => {
+            ...remoteCredits.map((transaction) => {
               const localTransaction = localTransactionMap.get(transaction.id);
-
               return localTransaction?.recoveryReminder
                 ? { ...transaction, recoveryReminder: localTransaction.recoveryReminder }
                 : transaction;
+            }),
+            ...remoteExpenses.map((transaction) => {
+              const mergedTransaction = mergeReceivable(transaction);
+              const localTransaction = localTransactionMap.get(mergedTransaction.id);
+
+              return localTransaction?.recoveryReminder
+                ? { ...mergedTransaction, recoveryReminder: localTransaction.recoveryReminder }
+                : mergedTransaction;
             })
           ];
         });
         setApiStatus("online");
         setApiMessage("Connected to FastAPI backend");
-      } catch {
+      } catch (error) {
         if (cancelled) {
           return;
         }
 
+        if (error instanceof ApiError && error.status === 401) {
+          setApiStatus("offline");
+          setApiMessage("Your session expired. Please sign in again.");
+          void logout();
+          return;
+        }
+
         setApiStatus("offline");
-        setApiMessage("Backend unavailable, using local demo data");
+        setApiMessage("Backend unavailable, using locally stored entries");
       }
     };
 
@@ -99,7 +156,7 @@ export const useExpenses = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [logout]);
 
   const filteredTransactions = transactions.filter((transaction) => {
     const normalizedQuery = filters.query.trim().toLowerCase();
@@ -126,6 +183,17 @@ export const useExpenses = () => {
   });
 
   const summary = buildDashboardSummary(filteredTransactions);
+
+  const handleUnauthorized = async (error: unknown) => {
+    if (error instanceof ApiError && error.status === 401) {
+      setApiStatus("offline");
+      setApiMessage("Your session expired. Please sign in again.");
+      await logout();
+      return true;
+    }
+
+    return false;
+  };
 
   const addExpense = async (transactionInput: CreateExpensePayload) => {
     const timestamp = new Date(`${transactionInput.date}T12:00:00.000Z`).toISOString();
@@ -163,13 +231,38 @@ export const useExpenses = () => {
 
     try {
       const createdTransaction = await createExpense(transactionInput);
-      const transactionWithReminder = localTransaction.recoveryReminder
-        ? { ...createdTransaction, recoveryReminder: localTransaction.recoveryReminder }
-        : createdTransaction;
+      let transactionWithReminder = createdTransaction;
+
+      if (transactionInput.recoveryReminder) {
+        const receivable = await createReceivable({
+          amount: createdTransaction.amount,
+          title: createdTransaction.merchant ?? transactionInput.merchant ?? "Recoverable payment",
+          note: transactionInput.note,
+          remindAt: transactionInput.recoveryReminder.dueDate,
+          expenseId: createdTransaction.id
+        });
+
+        transactionWithReminder = {
+          ...createdTransaction,
+          recoveryReminder: {
+            status: receivable.status,
+            dueDate: receivable.remindAt,
+            reminderDays: transactionInput.recoveryReminder.reminderDays,
+            createdAt: receivable.createdAt,
+            collectionCreditId: receivable.receivedTransactionId,
+            collectedAt: receivable.receivedAt
+          }
+        };
+      }
+
       setTransactions((currentTransactions) => [transactionWithReminder, ...currentTransactions]);
       setApiStatus("online");
       setApiMessage("Expense saved to FastAPI backend");
-    } catch {
+    } catch (error) {
+      if (await handleUnauthorized(error)) {
+        return;
+      }
+
       setTransactions((currentTransactions) => [localTransaction, ...currentTransactions]);
       setApiStatus("offline");
       setApiMessage("Saved locally because the backend is unavailable");
@@ -181,32 +274,41 @@ export const useExpenses = () => {
     const merchant = creditInput.merchant.trim();
     const note = creditInput.note?.trim() || undefined;
 
-    setTransactions((currentTransactions) => [
-      {
-        id: crypto.randomUUID(),
-        date: timestamp,
-        amount: creditInput.amount,
-        currency: "INR",
-        direction: "credit",
-        status: "completed",
-        merchant,
-        merchantNormalized: normalizeMerchant(merchant),
-        description: note || `${creditInput.paymentMethod} credit from ${merchant}`,
-        note,
-        paymentMethod: creditInput.paymentMethod,
-        source: "manual",
-        category: creditInput.category,
-        categoryConfidence: 1,
-        isAutoCategorized: false,
-        tags: ["manual-credit", "local-credit"],
-        rawMessage: undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      ...currentTransactions
-    ]);
+    const localCredit: Transaction = {
+      id: crypto.randomUUID(),
+      date: timestamp,
+      amount: creditInput.amount,
+      currency: "INR",
+      direction: "credit",
+      status: "completed",
+      merchant,
+      merchantNormalized: normalizeMerchant(merchant),
+      description: note || `${creditInput.paymentMethod} credit from ${merchant}`,
+      note,
+      paymentMethod: creditInput.paymentMethod,
+      source: "manual",
+      category: creditInput.category,
+      categoryConfidence: 1,
+      isAutoCategorized: false,
+      tags: ["manual-credit", "local-credit"],
+      rawMessage: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
 
-    setApiMessage("Credit saved locally and included in dashboard totals");
+    try {
+      const createdCredit = await createCredit(creditInput);
+      setTransactions((currentTransactions) => [createdCredit, ...currentTransactions]);
+      setApiStatus("online");
+      setApiMessage("Credit saved to FastAPI backend");
+    } catch (error) {
+      if (await handleUnauthorized(error)) {
+        return;
+      }
+
+      setTransactions((currentTransactions) => [localCredit, ...currentTransactions]);
+      setApiMessage("Credit saved locally and included in dashboard totals");
+    }
   };
 
   const updateExpense = async (
@@ -243,11 +345,6 @@ export const useExpenses = () => {
 
     applyLocalUpdate(updates.paymentMethod);
 
-    if (existingTransaction?.direction === "credit") {
-      setApiMessage("Credit updated locally");
-      return;
-    }
-
     try {
       const updatedTransaction = await updateExpenseById(transactionId, updates);
       setTransactions((currentTransactions) =>
@@ -264,60 +361,108 @@ export const useExpenses = () => {
         setApiStatus("online");
         setApiMessage("Transaction updated in backend");
       }
-    } catch {
+    } catch (error) {
+      if (await handleUnauthorized(error)) {
+        return;
+      }
+
       setApiStatus("offline");
       setApiMessage("Edit saved locally only because backend update failed");
     }
   };
 
-  const markRecoveryReceived = (transactionId: string) => {
+  const deleteTransaction = async (transactionId: string) => {
+    const existingTransaction = transactions.find((transaction) => transaction.id === transactionId);
+    if (!existingTransaction) {
+      return;
+    }
+
+    const removeTransaction = () => {
+      setTransactions((currentTransactions) =>
+        currentTransactions.filter((transaction) => transaction.id !== transactionId)
+      );
+    };
+    const linkedRecoveryCreditId = existingTransaction.recoveryReminder?.collectionCreditId;
+
+    removeTransaction();
+
+    if (linkedRecoveryCreditId) {
+      setTransactions((currentTransactions) =>
+        currentTransactions.filter((transaction) => transaction.id !== linkedRecoveryCreditId)
+      );
+    }
+
+    try {
+      await deleteTransactionById(transactionId);
+      setApiStatus("online");
+      setApiMessage("Transaction deleted from backend");
+    } catch (error) {
+      if (await handleUnauthorized(error)) {
+        return;
+      }
+
+      setApiStatus("offline");
+      setApiMessage("Transaction removed locally only because backend delete failed");
+    }
+  };
+
+  const markRecoveryReceived = async (transactionId: string) => {
     const transaction = transactions.find((entry) => entry.id === transactionId);
     if (!transaction || transaction.recoveryReminder?.status !== "open") {
       return;
     }
-
-    const creditId = crypto.randomUUID();
     const collectedAt = new Date().toISOString();
-    const merchant = transaction.merchant ?? "Recovered amount";
 
-    setTransactions((currentTransactions) => [
-      {
-        id: creditId,
-        date: collectedAt,
-        amount: transaction.amount,
-        currency: "INR",
-        direction: "credit",
-        status: "completed",
-        merchant,
-        merchantNormalized: normalizeMerchant(merchant),
-        description: `Recovered amount from ${merchant}`,
-        note: `Collected back for ${transaction.description}`,
+    try {
+      const receivables = await fetchReceivables();
+      const matchingReceivable = receivables.find((receivable) => receivable.expenseId === transactionId);
+      if (!matchingReceivable) {
+        setApiMessage("Could not find the linked receivable in backend");
+        return;
+      }
+
+      const updatedReceivable = await markReceivableReceived({
+        reminderId: matchingReceivable.id,
         paymentMethod: transaction.paymentMethod,
-        source: "manual",
-        category: "Transfer",
-        categoryConfidence: 1,
-        isAutoCategorized: false,
-        tags: ["recovery-credit"],
-        createdAt: collectedAt,
-        updatedAt: collectedAt
-      },
-      ...currentTransactions.map((entry) =>
-        entry.id === transactionId
-          ? {
-              ...entry,
-              recoveryReminder: {
-                ...entry.recoveryReminder!,
-                status: "collected" as const,
-                collectedAt,
-                collectionCreditId: creditId
-              },
-              updatedAt: collectedAt
-            }
-          : entry
-      )
-    ]);
+        receivedAt: collectedAt,
+        note: `Collected back for ${transaction.description}`
+      });
 
-    setApiMessage("Recovered amount added to credits");
+      const latestCredits = await fetchCredits();
+      const receivedCredit = latestCredits.find(
+        (entry) => entry.id === updatedReceivable.receivedTransactionId
+      );
+
+      setTransactions((currentTransactions) => {
+        const creditRows = currentTransactions.filter(
+          (entry) => entry.direction === "credit" && entry.id !== updatedReceivable.receivedTransactionId
+        );
+        const debitRows = currentTransactions.map((entry) =>
+          entry.id === transactionId
+            ? {
+                ...entry,
+                recoveryReminder: {
+                  ...entry.recoveryReminder!,
+                  status: "collected" as const,
+                  collectedAt: updatedReceivable.receivedAt ?? collectedAt,
+                  collectionCreditId: updatedReceivable.receivedTransactionId
+                },
+                updatedAt: updatedReceivable.updatedAt
+              }
+            : entry
+        );
+
+        return receivedCredit ? [receivedCredit, ...creditRows, ...debitRows.filter((entry) => entry.direction !== "credit")] : [...creditRows, ...debitRows.filter((entry) => entry.direction !== "credit")];
+      });
+
+      setApiMessage("Recovered amount added to credits");
+    } catch (error) {
+      if (await handleUnauthorized(error)) {
+        return;
+      }
+
+      setApiMessage("Could not mark the receivable as received right now");
+    }
   };
 
   return {
@@ -325,13 +470,13 @@ export const useExpenses = () => {
     filteredTransactions,
     filters,
     setFilters,
-    importJobs,
     summary,
     apiStatus,
     apiMessage,
     addExpense,
     addCredit,
     updateExpense,
+    deleteTransaction,
     markRecoveryReceived
   };
 };

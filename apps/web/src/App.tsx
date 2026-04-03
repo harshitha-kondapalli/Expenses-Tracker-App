@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { formatCurrency } from "@expenses/shared";
-import { AppHeader } from "./components/AppHeader";
+import { useAuth } from "./auth/AuthContext";
+import { AppHeader, type AppSection } from "./components/AppHeader";
+import { AuthScreen } from "./components/AuthScreen";
 import { CategoryBreakdown } from "./components/CategoryBreakdown";
 import { CreditForm } from "./components/CreditForm";
 import { DuePaymentsBoard } from "./components/DuePaymentsBoard";
@@ -12,7 +15,6 @@ import { SummaryCard } from "./components/SummaryCard";
 import { TransactionTable } from "./components/TransactionTable";
 import { TrendChart } from "./components/TrendChart";
 import { useExpenses } from "./hooks/useExpenses";
-import { useState } from "react";
 
 const buildTrendFromTransactions = (
   transactions: ReturnType<typeof useExpenses>["transactions"],
@@ -38,10 +40,9 @@ const buildTrendFromTransactions = (
     .map(([label, total]) => ({ label, total }));
 };
 
-const App = () => {
-  const [activeSection, setActiveSection] = useState<
-    "dashboard" | "transactions" | "credits" | "recoveries" | "savings" | "payment-history" | "due-payments"
-  >("dashboard");
+const AuthenticatedApp = () => {
+  const { user, logout } = useAuth();
+  const [activeSection, setActiveSection] = useState<AppSection>("dashboard");
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [dismissedRecoveryIds, setDismissedRecoveryIds] = useState<string[]>([]);
   const {
@@ -55,8 +56,10 @@ const App = () => {
     addExpense,
     addCredit,
     updateExpense,
+    deleteTransaction,
     markRecoveryReceived
   } = useExpenses();
+
   const totalCredited = filteredTransactions
     .filter((transaction) => transaction.direction === "credit" && transaction.status === "completed")
     .reduce((sum, transaction) => sum + transaction.amount, 0);
@@ -144,25 +147,22 @@ const App = () => {
   const activeRecoveryPopup = dueRecoveries.find(
     (transaction) => !dismissedRecoveryIds.includes(transaction.id)
   );
-  const navigateToSection = (
-    section:
-      | "dashboard"
-      | "transactions"
-      | "credits"
-      | "recoveries"
-      | "savings"
-      | "payment-history"
-      | "due-payments"
-  ) => {
+
+  const navigateToSection = (section: AppSection) => {
     setActiveSection(section);
     if (section === "savings") {
       setFilters({ ...filters, category: "Savings" });
     }
   };
+
   const openSavingsDashboard = () => {
     setActiveSection("savings");
     setFilters({ ...filters, category: "Savings" });
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <main className="app-shell">
@@ -170,6 +170,9 @@ const App = () => {
         activeSection={activeSection}
         onNavigate={navigateToSection}
         onOpenComposer={() => setIsComposerOpen(true)}
+        userName={user.name}
+        userEmail={user.email}
+        onLogout={logout}
       />
 
       {activeSection === "dashboard" ? (
@@ -228,18 +231,10 @@ const App = () => {
                 <button type="button" className="primary-cta large-cta" onClick={() => setIsComposerOpen(true)}>
                   Add expense
                 </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => navigateToSection("credits")}
-                >
+                <button type="button" className="ghost-button" onClick={() => navigateToSection("credits")}>
                   Add credit
                 </button>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => navigateToSection("recoveries")}
-                >
+                <button type="button" className="ghost-button" onClick={() => navigateToSection("recoveries")}>
                   View recoveries
                 </button>
               </div>
@@ -323,7 +318,11 @@ const App = () => {
       {activeSection === "transactions" ? (
         <>
           <FiltersBar filters={filters} onChange={setFilters} />
-          <TransactionTable transactions={filteredTransactions} onUpdate={updateExpense} />
+          <TransactionTable
+            transactions={filteredTransactions}
+            onUpdate={updateExpense}
+            onDelete={deleteTransaction}
+          />
         </>
       ) : null}
 
@@ -380,8 +379,7 @@ const App = () => {
               totals={creditTransactions.reduce(
                 (accumulator, transaction) => ({
                   ...accumulator,
-                  [transaction.paymentMethod]:
-                    accumulator[transaction.paymentMethod] + transaction.amount
+                  [transaction.paymentMethod]: accumulator[transaction.paymentMethod] + transaction.amount
                 }),
                 {
                   UPI: 0,
@@ -395,7 +393,11 @@ const App = () => {
             />
           </section>
 
-          <TransactionTable transactions={creditTransactions} onUpdate={updateExpense} />
+          <TransactionTable
+            transactions={creditTransactions}
+            onUpdate={updateExpense}
+            onDelete={deleteTransaction}
+          />
         </>
       ) : null}
 
@@ -514,7 +516,11 @@ const App = () => {
             />
           </section>
 
-          <TransactionTable transactions={savingsTransactions} onUpdate={updateExpense} />
+          <TransactionTable
+            transactions={savingsTransactions}
+            onUpdate={updateExpense}
+            onDelete={deleteTransaction}
+          />
         </>
       ) : null}
 
@@ -565,7 +571,11 @@ const App = () => {
             />
           </section>
 
-          <TransactionTable transactions={filteredTransactions} onUpdate={updateExpense} />
+          <TransactionTable
+            transactions={filteredTransactions}
+            onUpdate={updateExpense}
+            onDelete={deleteTransaction}
+          />
         </>
       ) : null}
 
@@ -639,6 +649,24 @@ const App = () => {
       ) : null}
     </main>
   );
+};
+
+const App = () => {
+  const { isAuthenticated, isAuthReady } = useAuth();
+
+  if (!isAuthReady) {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel auth-loading-panel">
+          <p className="eyebrow">Authentication</p>
+          <h2>Checking your session...</h2>
+          <p className="auth-panel-copy">Connecting to your account and restoring access to your workspace.</p>
+        </section>
+      </main>
+    );
+  }
+
+  return isAuthenticated ? <AuthenticatedApp /> : <AuthScreen />;
 };
 
 export default App;

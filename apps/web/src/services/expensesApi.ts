@@ -8,7 +8,7 @@ import {
   type ParsedExpenseInput,
   type Transaction
 } from "@expenses/shared";
-import { ApiError, requestJson } from "./api";
+import { ApiError, requestJson, requestVoid } from "./api";
 
 export type CreateExpensePayload = Pick<
   Transaction,
@@ -54,6 +54,20 @@ interface BackendExpense {
   created_at?: string | null;
 }
 
+interface BackendReceivable {
+  id: number | string;
+  expense_id?: number | string | null;
+  title: string;
+  amount: number;
+  note?: string | null;
+  remind_at: string;
+  status: string;
+  received_transaction_id?: number | string | null;
+  received_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface BackendExpenseUpdateRequest {
   amount: number;
   category: string;
@@ -70,6 +84,34 @@ interface BackendExpenseCreateRequest {
   title: string;
   expense_at: string;
   payment_method?: string;
+}
+
+interface BackendReceivableCreateRequest {
+  amount: number;
+  title: string;
+  note: string;
+  remind_at: string;
+  expense_id?: number;
+}
+
+interface BackendReceivableReceiveRequest {
+  payment_method?: string;
+  received_at?: string;
+  note?: string;
+}
+
+export interface ReceivableReminderRecord {
+  id: string;
+  expenseId?: string;
+  title: string;
+  amount: number;
+  note?: string;
+  remindAt: string;
+  status: "open" | "collected";
+  receivedTransactionId?: string;
+  receivedAt?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const isFrontendTransaction = (value: unknown): value is Transaction =>
@@ -145,7 +187,10 @@ const adaptBackendParseResponse = (
   };
 };
 
-const adaptBackendExpense = (expense: BackendExpense): Transaction => {
+const adaptBackendExpense = (
+  expense: BackendExpense,
+  direction: Transaction["direction"] = "debit"
+): Transaction => {
   const merchant = expense.title?.trim() || expense.note?.trim() || "Manual Entry";
   const note = expense.note?.trim() || undefined;
   const date = expense.expense_at || expense.created_at || new Date().toISOString();
@@ -156,11 +201,11 @@ const adaptBackendExpense = (expense: BackendExpense): Transaction => {
     date,
     amount: expense.amount,
     currency: "INR",
-    direction: "debit",
+    direction,
     status: "completed",
     merchant,
     merchantNormalized: normalizeMerchant(merchant),
-    description: note || merchant,
+    description: note || `${direction === "credit" ? "Credit from" : "Payment to"} ${merchant}`,
     note,
     paymentMethod: normalizePaymentMethod(expense.payment_method),
     source: "manual",
@@ -173,6 +218,22 @@ const adaptBackendExpense = (expense: BackendExpense): Transaction => {
     updatedAt: createdAt
   };
 };
+
+const adaptBackendReceivable = (reminder: BackendReceivable): ReceivableReminderRecord => ({
+  id: String(reminder.id),
+  expenseId: reminder.expense_id ? String(reminder.expense_id) : undefined,
+  title: reminder.title,
+  amount: reminder.amount,
+  note: reminder.note?.trim() || undefined,
+  remindAt: reminder.remind_at,
+  status: reminder.status === "collected" ? "collected" : "open",
+  receivedTransactionId: reminder.received_transaction_id
+    ? String(reminder.received_transaction_id)
+    : undefined,
+  receivedAt: reminder.received_at || undefined,
+  createdAt: reminder.created_at,
+  updatedAt: reminder.updated_at
+});
 
 export const parseExpenseWithApi = async (
   input: string,
@@ -204,7 +265,21 @@ export const parseExpenseWithApi = async (
 
 export const fetchExpenses = async (): Promise<Transaction[]> => {
   const response = await requestJson<Transaction[] | BackendExpense[]>("/expenses");
-  return response.map((expense) => (isFrontendTransaction(expense) ? expense : adaptBackendExpense(expense)));
+  return response.map((expense) =>
+    isFrontendTransaction(expense) ? expense : adaptBackendExpense(expense, "debit")
+  );
+};
+
+export const fetchCredits = async (): Promise<Transaction[]> => {
+  const response = await requestJson<Transaction[] | BackendExpense[]>("/credits");
+  return response.map((expense) =>
+    isFrontendTransaction(expense) ? expense : adaptBackendExpense(expense, "credit")
+  );
+};
+
+export const fetchReceivables = async (): Promise<ReceivableReminderRecord[]> => {
+  const response = await requestJson<BackendReceivable[]>("/receivables?status=open&limit=100");
+  return response.map(adaptBackendReceivable);
 };
 
 export const createExpense = async (payload: CreateExpensePayload): Promise<Transaction> => {
@@ -222,7 +297,25 @@ export const createExpense = async (payload: CreateExpensePayload): Promise<Tran
     body: JSON.stringify(backendPayload)
   });
 
-  return isFrontendTransaction(response) ? response : adaptBackendExpense(response);
+  return isFrontendTransaction(response) ? response : adaptBackendExpense(response, "debit");
+};
+
+export const createCredit = async (payload: UpdateExpensePayload): Promise<Transaction> => {
+  const backendPayload: BackendExpenseCreateRequest = {
+    amount: payload.amount,
+    category: payload.category,
+    note: payload.note ?? "",
+    title: payload.merchant,
+    expense_at: new Date(`${payload.date}T12:00:00.000Z`).toISOString(),
+    payment_method: payload.paymentMethod.toLowerCase()
+  };
+
+  const response = await requestJson<Transaction | BackendExpense>("/expenses", {
+    method: "POST",
+    body: JSON.stringify(backendPayload)
+  });
+
+  return isFrontendTransaction(response) ? response : adaptBackendExpense(response, "credit");
 };
 
 export const updateExpenseById = async (
@@ -243,5 +336,64 @@ export const updateExpenseById = async (
     body: JSON.stringify(backendPayload)
   });
 
-  return isFrontendTransaction(response) ? response : adaptBackendExpense(response);
+  const direction = payload.category === "Salary" || payload.category === "Transfer" ? "credit" : "debit";
+  return isFrontendTransaction(response) ? response : adaptBackendExpense(response, direction);
+};
+
+export const deleteExpenseById = async (transactionId: string): Promise<void> => {
+  await requestVoid(`/expenses/${transactionId}`, {
+    method: "DELETE"
+  });
+};
+
+export const deleteTransactionById = async (transactionId: string): Promise<void> => {
+  await requestVoid(`/transactions/${transactionId}`, {
+    method: "DELETE"
+  });
+};
+
+export const createReceivable = async (payload: {
+  amount: number;
+  title: string;
+  note?: string;
+  remindAt: string;
+  expenseId?: string;
+}): Promise<ReceivableReminderRecord> => {
+  const backendPayload: BackendReceivableCreateRequest = {
+    amount: payload.amount,
+    title: payload.title,
+    note: payload.note ?? "",
+    remind_at: payload.remindAt,
+    expense_id: payload.expenseId ? Number(payload.expenseId) : undefined
+  };
+
+  const response = await requestJson<BackendReceivable>("/receivables", {
+    method: "POST",
+    body: JSON.stringify(backendPayload)
+  });
+
+  return adaptBackendReceivable(response);
+};
+
+export const markReceivableReceived = async (payload: {
+  reminderId: string;
+  paymentMethod: PaymentMethod;
+  receivedAt?: string;
+  note?: string;
+}): Promise<ReceivableReminderRecord> => {
+  const backendPayload: BackendReceivableReceiveRequest = {
+    payment_method: payload.paymentMethod.toLowerCase(),
+    received_at: payload.receivedAt,
+    note: payload.note ?? ""
+  };
+
+  const response = await requestJson<BackendReceivable>(
+    `/receivables/${payload.reminderId}/receive`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(backendPayload)
+    }
+  );
+
+  return adaptBackendReceivable(response);
 };
