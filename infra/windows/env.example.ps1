@@ -1,5 +1,0 @@
-$env:PORT = "4000"
-$env:EXCEL_PATH = "data\expenses.xlsx"
-$env:IMPORTS_DIR = "data\imports"
-$env:RAW_DIR = "data\raw"
-$env:LOG_LEVEL = "info"

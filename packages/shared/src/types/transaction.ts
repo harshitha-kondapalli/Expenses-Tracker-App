@@ -8,6 +8,15 @@ import type {
 } from "../constants/payment-methods";
 import type { ExpenseCategory } from "../constants/categories";
 
+export interface RecoveryReminder {
+  status: "open" | "collected";
+  dueDate: string;
+  reminderDays: number;
+  createdAt: string;
+  collectionCreditId?: string;
+  collectedAt?: string;
+}
+
 export interface Transaction {
   id: string;
   externalId?: string;
@@ -32,6 +41,7 @@ export interface Transaction {
   tags?: string[];
   rawMessage?: string;
   rawPayload?: Record<string, unknown>;
+  recoveryReminder?: RecoveryReminder;
   createdAt: string;
   updatedAt: string;
 }

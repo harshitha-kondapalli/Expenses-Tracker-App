@@ -10,6 +10,7 @@ export const expenseCategories = [
   "Recharge",
   "Education",
   "Rent",
+  "Savings",
   "Salary",
   "Transfer",
   "Other"

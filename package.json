@@ -4,15 +4,12 @@
   "version": "0.1.0",
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "services/*"
+    "packages/*"
   ],
   "scripts": {
     "dev:web": "npm --workspace @expenses/web run dev",
     "dev:mobile": "npm --workspace @expenses/mobile run start",
     "build:web": "npm --workspace @expenses/web run build",
-    "lint:web": "npm --workspace @expenses/web run lint",
-    "dev:api": "npm --workspace @expenses/api run dev",
-    "dev:collector": "npm --workspace @expenses/collector run dev"
+    "lint:web": "npm --workspace @expenses/web run lint"
   }
 }

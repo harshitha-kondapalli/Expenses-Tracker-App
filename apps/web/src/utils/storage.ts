@@ -1,8 +1,8 @@
-import type { Expense } from "@expenses/shared";
+import type { Transaction } from "@expenses/shared";
 
-const STORAGE_KEY = "expenses-tracker-web";
+const STORAGE_KEY = "expenses-tracker-web-transactions";
 
-export const loadExpenses = (): Expense[] => {
+export const loadTransactions = (): Transaction[] => {
   if (typeof window === "undefined") {
     return [];
   }
@@ -13,16 +13,16 @@ export const loadExpenses = (): Expense[] => {
   }
 
   try {
-    return JSON.parse(value) as Expense[];
+    return JSON.parse(value) as Transaction[];
   } catch {
     return [];
   }
 };
 
-export const saveExpenses = (expenses: Expense[]) => {
+export const saveTransactions = (transactions: Transaction[]) => {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(expenses));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
 };

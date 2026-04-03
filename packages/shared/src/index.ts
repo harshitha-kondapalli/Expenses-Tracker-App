@@ -4,11 +4,13 @@ export * from "./types/transaction";
 export * from "./types/dashboard";
 export * from "./types/import-job";
 export * from "./types/category-rule";
+export * from "./types/expense-parser";
 export * from "./utils/currency";
 export * from "./utils/date";
 export * from "./utils/normalize";
 export * from "./utils/expense-summary";
 export * from "./utils/dashboard";
+export * from "./utils/expense-parser";
 
 import type { Expense } from "./types/transaction";
 
