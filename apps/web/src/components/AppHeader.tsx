@@ -34,38 +34,54 @@ export const AppHeader = ({
   userEmail,
   onLogout
 }: AppHeaderProps) => (
-  <header className="app-topbar">
-    <div className="brand-lockup">
-      <p className="eyebrow">Expense tracker</p>
-      <strong>Money cockpit</strong>
-    </div>
-
-    <div className="topbar-actions">
-      <nav className="top-nav" aria-label="Primary">
-        {sections.map((section) => (
-          <button
-            key={section.id}
-            type="button"
-            className={section.id === activeSection ? "nav-chip nav-chip-active" : "nav-chip"}
-            onClick={() => onNavigate(section.id)}
-          >
-            {section.label}
-          </button>
-        ))}
+  <header className="app-header">
+    <div className="header-container">
+      <div className="brand-section">
+        <h1 className="brand-title">Money Cockpit</h1>
+        <span className="brand-subtitle">Expense Tracker</span>
+      </div>
+      <br/>
+      <nav className="main-navigation">
+        <div className="nav-group">
+          {sections.slice(0, 4).map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`nav-link ${section.id === activeSection ? "nav-link-active" : ""}`}
+              onClick={() => onNavigate(section.id)}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
+        <div className="nav-group">
+          {sections.slice(4).map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              className={`nav-link ${section.id === activeSection ? "nav-link-active" : ""}`}
+              onClick={() => onNavigate(section.id)}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
-      <button type="button" className="primary-cta" onClick={onOpenComposer}>
-        Add Expense
-      </button>
-
-      <div className="user-chip">
-        <div>
-          <strong>{userName}</strong>
-          <p>{userEmail}</p>
-        </div>
-        <button type="button" className="ghost-button" onClick={onLogout}>
-          Logout
+      <div className="header-actions">
+        <button type="button" className="btn-primary" onClick={onOpenComposer}>
+          + Add Expense
         </button>
+
+        <div className="user-menu">
+          <div className="user-info">
+            <span className="user-name">{userName}</span>
+            <span className="user-email">{userEmail}</span>
+          </div>
+          <button type="button" className="btn-ghost" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   </header>
