@@ -2,46 +2,83 @@ import { Minus, Plus, ArrowRight, PieChart as PieIcon, BarChart3, Activity } fro
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 
 export default function Dashboard({ 
-  recentTransactions, pendingRecoveries, stats, analytics, onAddExpense, onAddCredit, onViewLedger 
+  recentTransactions, 
+  pendingRecoveries, 
+  stats, 
+  analytics, 
+  filterMonth, 
+  setFilterMonth, 
+  filterYear, 
+  setFilterYear, 
+  onAddExpense, 
+  onAddCredit, 
+  onViewLedger 
 }) {
   const COLORS = ['#0f172a', '#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 animate-in fade-in duration-500 pb-10">
+    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 animate-in fade-in duration-500 pb-10 px-2 sm:px-0">
       
       {/* =========================================
           LEFT COLUMN: Insights & Data (Spans 8/12)
           ========================================= */}
       <div className="xl:col-span-8 space-y-8">
         
-        {/* 1. Greeting & Top Line Stats */}
-        <div>
-          <p className="text-xs font-bold text-amber-600 tracking-widest mb-2 uppercase">Overview</p>
-          <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tight">
-            {stats.net >= 0 ? "You are still cash-positive." : "You've spent more than you earned."}
-          </h2>
+        {/* 1. Greeting & Top Line Stats + TIME TRAVEL */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold text-amber-600 tracking-widest mb-2 uppercase">Overview</p>
+            <h2 className="text-4xl font-black text-slate-900 tracking-tight">
+              {stats.net >= 0 ? "You are still cash-positive." : "You've spent more than you earned."}
+            </h2>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-              <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Net Flow</p>
-              <p className={`text-2xl font-black ${stats.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                ₹{stats.net?.toLocaleString() || "0"}
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-              <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Top Category</p>
-              <p className="text-2xl font-black text-slate-900 truncate">
-                {analytics?.categories?.[0]?.name || 'N/A'}
-              </p>
-            </div>
-            <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
-              <p className="text-[10px] text-amber-600/70 font-black uppercase mb-2 tracking-widest">Recoveries</p>
-              <p className="text-2xl font-black text-amber-600">{pendingRecoveries.length} Pending</p>
-            </div>
+          {/* Time Machine Dropdowns */}
+          <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white shadow-sm shrink-0">
+            <select 
+              value={filterMonth} 
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="bg-white border-none font-bold text-slate-700 text-sm rounded-xl px-4 py-2 outline-none cursor-pointer hover:bg-slate-50 transition-colors"
+            >
+              {Array.from({length: 12}, (_, i) => (
+                <option key={i+1} value={i+1}>
+                  {new Date(0, i).toLocaleString('default', { month: 'long' })}
+                </option>
+              ))}
+            </select>
+            <select 
+              value={filterYear} 
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="bg-white border-none font-bold text-slate-700 text-sm rounded-xl px-4 py-2 outline-none cursor-pointer hover:bg-slate-50 transition-colors"
+            >
+              {[2024, 2025, 2026, 2027].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* Stat Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Net Flow</p>
+            <p className={`text-2xl font-black ${stats.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+              ₹{stats.net?.toLocaleString() || "0"}
+            </p>
+          </div>
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Top Category</p>
+            <p className="text-2xl font-black text-slate-900 truncate">
+              {analytics?.categories?.[0]?.name || 'N/A'}
+            </p>
+          </div>
+          <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
+            <p className="text-[10px] text-amber-600/70 font-black uppercase mb-2 tracking-widest">Recoveries</p>
+            <p className="text-2xl font-black text-amber-600">{pendingRecoveries.length} Pending</p>
           </div>
         </div>
 
-        {/* 2. Charts Row (Given room to breathe!) */}
+        {/* 2. Charts Row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Pie Chart */}
           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
@@ -52,12 +89,22 @@ export default function Dashboard({
              <div className="h-48 w-full">
                <ResponsiveContainer width="100%" height="100%">
                  <PieChart>
-                   <Pie data={analytics?.categories || []} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={4} dataKey="value" stroke="none">
-                     {analytics?.categories?.map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                   <Pie 
+                     data={analytics?.categories?.length > 0 ? analytics.categories : [{name: "No Data", value: 1}]} 
+                     cx="50%" cy="50%" 
+                     innerRadius={50} outerRadius={75} 
+                     paddingAngle={4} 
+                     dataKey="value" 
+                     stroke="none"
+                   >
+                     {(analytics?.categories?.length > 0 ? analytics.categories : [{name: "No Data", value: 1}]).map((entry, index) => (
+                       <Cell key={`cell-${index}`} fill={analytics?.categories?.length > 0 ? COLORS[index % COLORS.length] : '#e2e8f0'} />
                      ))}
                    </Pie>
-                   <Tooltip formatter={(value) => `₹${value.toLocaleString()}`} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                   <Tooltip 
+                     formatter={(value) => `₹${value.toLocaleString()}`} 
+                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                   />
                  </PieChart>
                </ResponsiveContainer>
              </div>
@@ -71,9 +118,16 @@ export default function Dashboard({
              </div>
              <div className="h-48 w-full">
                <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={analytics?.payment_modes || []} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                 <BarChart 
+                   data={analytics?.payment_modes?.length > 0 ? analytics.payment_modes : [{name: "No Data", value: 0}]} 
+                   margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
+                 >
                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={10} />
-                   <Tooltip cursor={{ fill: '#f8fafc', radius: 8 }} formatter={(value) => `₹${value.toLocaleString()}`} contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                   <Tooltip 
+                     cursor={{ fill: '#f8fafc', radius: 8 }} 
+                     formatter={(value) => `₹${value.toLocaleString()}`} 
+                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                   />
                    <Bar dataKey="value" fill="#1e293b" radius={[6, 6, 6, 6]} maxBarSize={40} />
                  </BarChart>
                </ResponsiveContainer>
@@ -110,7 +164,7 @@ export default function Dashboard({
                 </div>
               ))
             ) : (
-              <p className="p-10 text-center text-slate-400 font-bold">No transactions found.</p>
+              <p className="p-10 text-center text-slate-400 font-bold">No transactions found for this period.</p>
             )}
           </div>
         </div>
@@ -125,19 +179,21 @@ export default function Dashboard({
         {/* Total Debits Highlight */}
         <div className="bg-[#1e293b] text-white p-8 md:p-10 rounded-[3rem] shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-3">Total Monthly Debits</p>
-          <h3 className="text-5xl md:text-6xl font-black tracking-tighter relative z-10">
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-3 relative z-10">Total Monthly Debits</p>
+          <h3 className="text-5xl md:text-6xl font-black tracking-tighter relative z-10 break-words">
             ₹{stats.total_out?.toLocaleString() || "0"}
           </h3>
         </div>
 
         {/* Total Income */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex justify-between items-center">
-          <div>
+        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex justify-between items-center gap-4">
+          <div className="min-w-0">
             <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Total Money In</p>
-            <h3 className="text-3xl font-black text-slate-900">₹{stats.total_in?.toLocaleString() || "0"}</h3>
+            <h3 className="text-3xl font-black text-slate-900 truncate">
+              ₹{stats.total_in?.toLocaleString() || "0"}
+            </h3>
           </div>
-          <div className="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center">
+          <div className="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shrink-0">
              <Plus size={24} />
           </div>
         </div>
