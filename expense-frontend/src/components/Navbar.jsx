@@ -1,46 +1,55 @@
-import { LayoutDashboard, ReceiptText, Landmark, Undo2, PiggyBank, LogOut } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, Landmark, Undo2, PiggyBank } from 'lucide-react';
 
 export default function Navbar({ currentTab, setCurrentTab, user }) {
+  // These names MUST match the strings used in App.jsx exactly
   const tabs = [
-    { name: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-    { name: 'Transactions', icon: <ReceiptText size={18} /> },
-    { name: 'Credits', icon: <Landmark size={18} /> },
-    { name: 'Recoveries', icon: <Undo2 size={18} /> },
-    { name: 'Savings', icon: <PiggyBank size={18} /> },
+    { name: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { name: 'Transactions', icon: <ReceiptText size={20} /> },
+    { name: 'Debts', icon: <Landmark size={20} /> },
+    { name: 'Recoveries', icon: <Undo2 size={20} /> },
+    { name: 'Savings', icon: <PiggyBank size={20} /> }
   ];
 
   return (
-    <nav className="max-w-7xl mx-auto bg-white/80 backdrop-blur-lg rounded-[3rem] p-5 md:px-12 flex flex-col lg:flex-row justify-between items-center shadow-sm border border-white mb-12 gap-8">
-      <div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none">Money Cockpit</h1>
-        <p className="text-[9px] font-black text-slate-400 tracking-[0.5em] uppercase mt-1">Avionics System v1.0</p>
+    <nav className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+      {/* Brand / Logo Section */}
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center shadow-lg">
+          <span className="text-white font-black text-xl tracking-tighter">MC</span>
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Money Cockpit</h1>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Pilot: {user?.name || 'Guest'}</p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-1.5 p-2 bg-slate-200/40 rounded-[2rem]">
+      {/* Navigation Tabs */}
+      <div className="flex flex-wrap justify-center gap-2 bg-white/50 backdrop-blur-md p-2 rounded-[2rem] border border-white shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab.name}
             onClick={() => setCurrentTab(tab.name)}
-            className={`flex items-center gap-2 px-8 py-3.5 rounded-[1.5rem] text-sm font-black transition-all ${
-              currentTab === tab.name 
-              ? 'bg-[#1e293b] text-white shadow-2xl scale-105' 
-              : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+            className={`flex items-center gap-2 px-6 py-3 rounded-[1.5rem] font-black text-sm transition-all duration-300 ${
+              currentTab === tab.name
+                ? 'bg-slate-900 text-white shadow-xl scale-105'
+                : 'text-slate-500 hover:bg-white hover:text-slate-900 hover:shadow-sm'
             }`}
           >
             {tab.icon}
-            {tab.name}
+            <span className="hidden md:inline">{tab.name}</span>
           </button>
         ))}
       </div>
 
-      <div className="flex items-center gap-6 lg:pl-10">
-        <div className="text-right hidden sm:block">
-          <p className="text-sm font-black text-slate-900">{user.name}</p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Pilot Profile</p>
+      {/* Profile/Quick Status (Optional) */}
+      <div className="hidden lg:flex items-center gap-3 bg-white px-5 py-2.5 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-600">
+          <PiggyBank size={18} />
         </div>
-        <button className="p-4 bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all text-slate-400 hover:text-rose-500 shadow-sm group">
-          <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-        </button>
+        <div className="text-right">
+          <p className="text-[9px] font-black text-slate-400 uppercase">System Status</p>
+          <p className="text-xs font-black text-emerald-600">Active</p>
+        </div>
       </div>
     </nav>
   );
