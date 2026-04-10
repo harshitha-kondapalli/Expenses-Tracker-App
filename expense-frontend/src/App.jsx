@@ -10,6 +10,9 @@ import Savings from './components/Savings';
 import AddTransactionModal from './components/AddTransactionModal';
 import { Moon, Sun, LogOut } from 'lucide-react';
 
+// Pull the Backend URL from .env (Vercel/Local)
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 function MainApp() {
   const { user, signOut } = useAuth();
   
@@ -25,27 +28,34 @@ function MainApp() {
   const [filterMonth, setFilterMonth] = useState(new Date().getMonth() + 1);
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
 
-  // GLOBAL FETCH HEADER CONFIG
-  const fetchOptions = {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-ID': user?.id  // Send the logged-in user's ID to Python
-    }
-  };
+  // Helper for Headers (Injected into every fetch)
+  const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    'X-User-ID': user?.id 
+  });
 
   const fetchData = async () => {
     if (!user) return;
     try {
-      const transRes = await fetch('http://localhost:8000/transactions', fetchOptions);
-      setTransactions(await transRes.json());
+      // 1. Fetch Transactions
+      const transRes = await fetch(`${API_BASE}/transactions`, { headers: getHeaders() });
+      const transData = await transRes.json();
+      setTransactions(Array.isArray(transData) ? transData : []);
 
-      const statsRes = await fetch(`http://localhost:8000/stats?month=${filterMonth}&year=${filterYear}`, fetchOptions);
+      // 2. Fetch Stats (Filtered by Date)
+      const statsRes = await fetch(`${API_BASE}/stats?month=${filterMonth}&year=${filterYear}`, { 
+        headers: getHeaders() 
+      });
       setStats(await statsRes.json());
 
-      const analyticsRes = await fetch(`http://localhost:8000/analytics?month=${filterMonth}&year=${filterYear}`, fetchOptions);
+      // 3. Fetch Analytics
+      const analyticsRes = await fetch(`${API_BASE}/analytics?month=${filterMonth}&year=${filterYear}`, { 
+        headers: getHeaders() 
+      });
       setAnalytics(await analyticsRes.json());
-    } catch (err) { console.error("Data Fetch Error:", err); }
+    } catch (err) { 
+      console.error("Data Fetch Error:", err); 
+    }
   };
 
   useEffect(() => {
@@ -62,20 +72,71 @@ function MainApp() {
   return (
     <div className={`${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-[#f8eee4] text-slate-800'} min-h-screen transition-colors duration-500 p-4 md:p-10 pb-24 font-sans`}>
       
-      {/* --- UTILITY BAR --- */}
+      {/* Floating Action Buttons */}
       <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-4">
-        <button onClick={signOut} className="p-4 bg-rose-500 text-white rounded-full shadow-2xl active:scale-90"><LogOut size={24} /></button>
-        <button onClick={() => setDarkMode(!darkMode)} className={`p-4 rounded-full shadow-2xl transition-all ${darkMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-900 text-white'}`}><Sun size={24} /></button>
+        <button 
+          onClick={signOut} 
+          className="p-4 bg-rose-500 text-white rounded-full shadow-2xl hover:bg-rose-600 active:scale-95 transition-all"
+          title="Logout"
+        >
+          <LogOut size={24} />
+        </button>
+        <button 
+          onClick={() => setDarkMode(!darkMode)} 
+          className={`p-4 rounded-full shadow-2xl transition-all ${darkMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-900 text-white'}`}
+        >
+          {darkMode ? <Sun size={24} /> : <Moon size={24} />}
+        </button>
       </div>
 
-      <Navbar currentTab={currentTab} setCurrentTab={setCurrentTab} user={{ name: user.email.split('@')[0] }} darkMode={darkMode} />
+      <Navbar 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        user={{ 
+            name: user.user_metadata?.first_name 
+            ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim()
+            : (user.email?.split('@')[0] || 'Pilot')
+        }} 
+        darkMode={darkMode} 
+      />
 
-      <main className="max-w-7xl mx-auto">
-        {currentTab === 'Dashboard' && <Dashboard recentTransactions={transactions} pendingRecoveries={pendingRecoveries} stats={stats} analytics={analytics} filterMonth={filterMonth} setFilterMonth={setFilterMonth} filterYear={filterYear} setFilterYear={setFilterYear} onAddExpense={() => setActiveModal('debit')} onAddCredit={() => setActiveModal('credit')} onViewLedger={() => setCurrentTab('Transactions')} darkMode={darkMode} />}
-        {currentTab === 'Transactions' && <Transactions transactions={filteredTransactions} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={async (id) => { await fetch(`http://localhost:8000/transactions/${id}`, { method: 'DELETE', ...fetchOptions }); fetchData(); }} onEdit={() => {}} darkMode={darkMode} />}
+      <main className="max-w-7xl mx-auto mt-6">
+        {currentTab === 'Dashboard' && (
+          <Dashboard 
+            recentTransactions={transactions.slice(0, 5)} 
+            pendingRecoveries={pendingRecoveries} 
+            stats={stats} 
+            analytics={analytics} 
+            filterMonth={filterMonth} 
+            setFilterMonth={setFilterMonth} 
+            filterYear={filterYear} 
+            setFilterYear={setFilterYear} 
+            onAddExpense={() => setActiveModal('debit')} 
+            onAddCredit={() => setActiveModal('credit')} 
+            onViewLedger={() => setCurrentTab('Transactions')} 
+            darkMode={darkMode} 
+          />
+        )}
+        
+        {currentTab === 'Transactions' && (
+          <Transactions 
+            transactions={filteredTransactions} 
+            searchQuery={searchQuery} 
+            setSearchQuery={setSearchQuery} 
+            onDelete={async (id) => { 
+              await fetch(`${API_BASE}/transactions/${id}`, { 
+                method: 'DELETE', 
+                headers: getHeaders() 
+              }); 
+              fetchData(); 
+            }} 
+            darkMode={darkMode} 
+          />
+        )}
+
         {currentTab === 'Debts' && <Debts transactions={transactions} darkMode={darkMode} />}
         {currentTab === 'Recoveries' && <Recoveries transactions={transactions} onSuccess={fetchData} darkMode={darkMode} />}
-        {currentTab === 'Savings' && <Savings darkMode={darkMode} />}
+        {currentTab === 'Savings' && <Savings darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}
       </main>
 
       {activeModal && (
@@ -84,17 +145,22 @@ function MainApp() {
           user={user} 
           onClose={() => setActiveModal(null)} 
           onSuccess={fetchData} 
-          darkMode={darkMode} 
+          darkMode={darkMode}
+          API_BASE={API_BASE}
         />
       )}
     </div>
   );
 }
 
-// Wrapper for Auth context
+// Global Auth Guard
 function AuthWrapper() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#f8eee4]">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-slate-900"></div>
+    </div>
+  );
   return user ? <MainApp /> : <Auth />;
 }
 

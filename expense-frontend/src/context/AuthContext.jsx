@@ -33,10 +33,18 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = (email, password) =>
-    supabase
-      ? supabase.auth.signUp({ email, password })
-      : Promise.resolve({ data: null, error: missingSupabaseError });
+  const signUp = (email, password, metadata) => 
+  supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: { // This stores the info in user_metadata
+        first_name: metadata.first_name,
+        last_name: metadata.last_name,
+        phone: metadata.phone
+      }
+    }
+  });
 
   const signIn = (email, password) =>
     supabase
