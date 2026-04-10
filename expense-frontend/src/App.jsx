@@ -10,6 +10,7 @@ import Savings from './components/Savings';
 import AddTransactionModal from './components/AddTransactionModal';
 import FeatureAnnouncement from './components/FeatureAnnouncement';
 import {Toaster} from 'react-hot-toast';
+import Goals from './components/Goals';
 import { Moon, Sun, LogOut } from 'lucide-react';
 
 // Pull the Backend URL from .env (Vercel/Render)
@@ -139,8 +140,21 @@ function MainApp() {
 
         {currentTab === 'Debts' && <Debts transactions={transactions} darkMode={darkMode} />}
         {currentTab === 'Recoveries' && <Recoveries transactions={transactions} onSuccess={fetchData} darkMode={darkMode} />}
-        {currentTab === 'Savings' && <Savings darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}        </main>
+        {currentTab === 'Goals' && (
+  <Goals 
+    darkMode={darkMode} 
+    API_BASE={API_BASE} 
+    headers={getHeaders()} // Change this from headers to getHeaders()
+  />
+)}
 
+{currentTab === 'Savings' && (
+  <Savings 
+    darkMode={darkMode} 
+    API_BASE={API_BASE} 
+    headers={getHeaders()} // Change this from headers to getHeaders()
+  />)}
+        </main>
       {activeModal && (
         <AddTransactionModal 
           type={activeModal} 
