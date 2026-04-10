@@ -8,10 +8,11 @@ import Recoveries from './components/Recoveries';
 import Debts from './components/Debts';
 import Savings from './components/Savings';
 import AddTransactionModal from './components/AddTransactionModal';
+import FeatureAnnouncement from './components/FeatureAnnouncement';
 import { Moon, Sun, LogOut } from 'lucide-react';
 
 // Pull the Backend URL from .env (Vercel/Render)
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://expenses-tracker-app-backend-main.onrender.com';;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://expenses-tracker-app-backend-main.onrender.com';
 
 function MainApp() {
   const { user, signOut } = useAuth();
@@ -101,6 +102,7 @@ function MainApp() {
       />
 
       <main className="max-w-7xl mx-auto mt-6">
+        <FeatureAnnouncement darkMode={darkMode} />
         {currentTab === 'Dashboard' && (
           <Dashboard 
             recentTransactions={transactions.slice(0, 5)} 
