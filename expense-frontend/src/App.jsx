@@ -37,6 +37,30 @@ function MainApp() {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
+const handleAddWithScreenshot = async (file) => {
+  const loadingToast = toast.loading("AI Vision reading screenshot...");
+  
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = async () => {
+    const base64Str = reader.result.split(',')[1];
+    try {
+      const res = await fetch(`${API_BASE}/transactions/analyze-screenshot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Str })
+      });
+      const data = await res.json();
+      
+      // Open the modal and pass the pre-filled AI data
+      setActiveModal({ type: 'debit', prefill: data });
+      toast.success("Vision extraction complete!", { id: loadingToast });
+    } catch (err) {
+      toast.error("Vision failed to read image", { id: loadingToast });
+    }
+  };
+};
+
   // SAFE HEADERS: Prevents "undefined" UUID crashes
   const getHeaders = () => {
     const headers = { 'Content-Type': 'application/json' };
@@ -135,18 +159,18 @@ function MainApp() {
         
         {currentTab === 'Dashboard' && (
           <Dashboard 
+            onAddWithScreenshot={handleAddWithScreenshot}
             recentTransactions={transactions.slice(0, 5)} 
             pendingRecoveries={pendingRecoveries} 
             stats={stats} analytics={analytics} 
             filterMonth={filterMonth} setFilterMonth={setFilterMonth} 
             filterYear={filterYear} setFilterYear={setFilterYear} 
-            onAddExpense={() => setActiveModal('debit')} 
-            onAddCredit={() => setActiveModal('credit')} 
+            onAddExpense={() => setActiveModal({ type: 'debit' })} // Changed to object
+            onAddCredit={() => setActiveModal({ type: 'credit' })} // Changed to object
             onViewLedger={() => setCurrentTab('Transactions')} 
             darkMode={darkMode} 
           />
         )}
-        
         {currentTab === 'Transactions' && (
           <Transactions transactions={filteredTransactions} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={async (id) => { await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE', headers: getHeaders() }); fetchData(); }} darkMode={darkMode} />
         )}
@@ -157,24 +181,32 @@ function MainApp() {
         {currentTab === 'Savings' && <Savings darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}
 
         {isProfileOpen && (
-        <UserProfilePane 
-          user={user} 
-          accounts={accounts} 
-          onClose={() => setIsProfileOpen(false)} 
-          onSuccess={fetchData} 
-          darkMode={darkMode} 
-          API_BASE={API_BASE} 
-        />
-      )}
+          <UserProfilePane user={user} accounts={accounts} onClose={() => setIsProfileOpen(false)} onSuccess={fetchData} darkMode={darkMode} API_BASE={API_BASE} />
+        )}
       </main>
 
       {/* MODAL ROUTING */}
-      {activeModal === 'debit' && (
-        <AddExpenseModal user={user} onClose={() => setActiveModal(null)} onSuccess={fetchData} darkMode={darkMode} API_BASE={API_BASE} accounts={accounts} />
+      {activeModal?.type === 'debit' && (
+        <AddExpenseModal 
+          user={user} 
+          prefill={activeModal.prefill} // AI data passed here
+          onClose={() => setActiveModal(null)} 
+          onSuccess={fetchData} 
+          darkMode={darkMode} 
+          API_BASE={API_BASE} 
+          accounts={accounts} 
+        />
       )}
       
-      {activeModal === 'credit' && (
-        <AddIncomeModal user={user} onClose={() => setActiveModal(null)} onSuccess={fetchData} darkMode={darkMode} API_BASE={API_BASE} accounts={accounts} />
+     {activeModal?.type === 'credit' && (
+        <AddIncomeModal 
+          user={user} 
+          onClose={() => setActiveModal(null)} 
+          onSuccess={fetchData} 
+          darkMode={darkMode} 
+          API_BASE={API_BASE} 
+          accounts={accounts} 
+        />
       )}
     </div>
   );

@@ -1,7 +1,17 @@
-import { Minus, Plus, ArrowRight, PieChart as PieIcon, BarChart3, Activity } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
+import React from 'react';
+import { 
+  Plus, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  Wallet, 
+  History, 
+  Camera, 
+  Sparkles, 
+  AlertCircle 
+} from 'lucide-react';
 
 export default function Dashboard({ 
+  onAddWithScreenshot, 
   recentTransactions, 
   pendingRecoveries, 
   stats, 
@@ -12,205 +22,157 @@ export default function Dashboard({
   setFilterYear, 
   onAddExpense, 
   onAddCredit, 
-  onViewLedger 
+  onViewLedger, 
+  darkMode 
 }) {
-  const COLORS = ['#0f172a', '#3b82f6', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6'];
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const cardClass = `p-8 rounded-[3rem] shadow-xl transition-all duration-300 ${
+    darkMode ? 'bg-slate-800 text-white' : 'bg-white text-slate-900'
+  }`;
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 animate-in fade-in duration-500 pb-10 px-2 sm:px-0">
+    <div className="space-y-8 animate-in fade-in duration-500">
       
-      {/* =========================================
-          LEFT COLUMN: Insights & Data (Spans 8/12)
-          ========================================= */}
-      <div className="xl:col-span-8 space-y-8">
+      {/* HEADER & FILTERS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
+        <div>
+          <h2 className="text-4xl font-black tracking-tighter italic uppercase">Overview</h2>
+          <p className="font-bold opacity-50 uppercase text-[10px] tracking-[0.3em]">Financial Mission Control</p>
+        </div>
         
-        {/* 1. Greeting & Top Line Stats + TIME TRAVEL */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold text-amber-600 tracking-widest mb-2 uppercase">Overview</p>
-            <h2 className="text-4xl font-black text-slate-900 tracking-tight">
-              {stats.net >= 0 ? "You are still cash-positive." : "You've spent more than you earned."}
-            </h2>
+        <div className="flex gap-3 bg-black/5 dark:bg-white/5 p-2 rounded-[2rem] backdrop-blur-md">
+          <select 
+            value={filterMonth} 
+            onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+            className="bg-transparent font-black px-4 py-2 outline-none cursor-pointer"
+          >
+            {months.map((m, i) => <option key={m} value={i + 1} className="text-black">{m}</option>)}
+          </select>
+          <select 
+            value={filterYear} 
+            onChange={(e) => setFilterYear(parseInt(e.target.value))}
+            className="bg-transparent font-black px-4 py-2 outline-none cursor-pointer"
+          >
+            {[2024, 2025, 2026].map(y => <option key={y} value={y} className="text-black">{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* QUICK ACTIONS & STATS ROW */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* MAGIC SCAN CARD */}
+        <label className={`group relative overflow-hidden p-8 rounded-[3rem] shadow-xl cursor-pointer transition-all hover:-translate-y-2 border-4 border-transparent hover:border-indigo-500/30 ${darkMode ? 'bg-slate-800' : 'bg-white'}`}>
+          <input 
+            type="file" 
+            accept="image/*" 
+            className="hidden" 
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file) onAddWithScreenshot(file);
+            }} 
+          />
+          <div className="flex items-center gap-5">
+            <div className="p-5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-[1.8rem] shadow-lg shadow-indigo-500/40">
+              <Camera size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black italic uppercase tracking-tight">Magic Scan</h3>
+              <p className="text-[10px] font-bold opacity-50 uppercase tracking-widest">PhonePe Screenshot</p>
+            </div>
+          </div>
+          <Sparkles className="absolute -right-4 -bottom-4 text-indigo-500/10 group-hover:text-indigo-500/20 transition-colors" size={120} />
+        </label>
+
+        {/* TOTAL INCOME */}
+        <div className={cardClass}>
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-2xl">
+              <ArrowDownLeft size={24} />
+            </div>
+            <button onClick={onAddCredit} className="text-[10px] font-black uppercase text-emerald-600 tracking-widest hover:opacity-70">+ Add Income</button>
+          </div>
+          <p className="text-[10px] font-black uppercase opacity-40 tracking-widest mb-1">Total Received</p>
+          <h4 className="text-3xl font-black">₹{stats.total_in?.toLocaleString() || 0}</h4>
+        </div>
+
+        {/* TOTAL EXPENSE */}
+        <div className={cardClass}>
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-rose-100 dark:bg-rose-900/30 text-rose-600 rounded-2xl">
+              <ArrowUpRight size={24} />
+            </div>
+            <button onClick={onAddExpense} className="text-[10px] font-black uppercase text-rose-600 tracking-widest hover:opacity-70">+ Add Expense</button>
+          </div>
+          <p className="text-[10px] font-black uppercase opacity-40 tracking-widest mb-1">Total Spent</p>
+          <h4 className="text-3xl font-black">₹{stats.total_out?.toLocaleString() || 0}</h4>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* RECENT TRANSACTIONS */}
+        <div className={cardClass}>
+          <div className="flex justify-between items-center mb-8">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+              <History size={20} className="text-indigo-500" /> Recent Activity
+            </h3>
+            <button onClick={onViewLedger} className="text-[10px] font-black opacity-50 uppercase hover:opacity-100 transition-opacity">View All</button>
           </div>
           
-          {/* Time Machine Dropdowns */}
-          <div className="flex items-center gap-2 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white shadow-sm shrink-0">
-            <select 
-              value={filterMonth} 
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="bg-white border-none font-bold text-slate-700 text-sm rounded-xl px-4 py-2 outline-none cursor-pointer hover:bg-slate-50 transition-colors"
-            >
-              {Array.from({length: 12}, (_, i) => (
-                <option key={i+1} value={i+1}>
-                  {new Date(0, i).toLocaleString('default', { month: 'long' })}
-                </option>
-              ))}
-            </select>
-            <select 
-              value={filterYear} 
-              onChange={(e) => setFilterYear(e.target.value)}
-              className="bg-white border-none font-bold text-slate-700 text-sm rounded-xl px-4 py-2 outline-none cursor-pointer hover:bg-slate-50 transition-colors"
-            >
-              {[2024, 2025, 2026, 2027].map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Net Flow</p>
-            <p className={`text-2xl font-black ${stats.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-              ₹{stats.net?.toLocaleString() || "0"}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-            <p className="text-[10px] text-slate-400 font-black uppercase mb-2 tracking-widest">Top Category</p>
-            <p className="text-2xl font-black text-slate-900 truncate">
-              {analytics?.categories?.[0]?.name || 'N/A'}
-            </p>
-          </div>
-          <div className="bg-amber-50/50 p-6 rounded-[2rem] border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
-            <p className="text-[10px] text-amber-600/70 font-black uppercase mb-2 tracking-widest">Recoveries</p>
-            <p className="text-2xl font-black text-amber-600">{pendingRecoveries.length} Pending</p>
-          </div>
-        </div>
-
-        {/* 2. Charts Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Pie Chart */}
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
-             <div className="flex items-center gap-2 mb-6">
-                <PieIcon size={16} className="text-blue-500" />
-                <h3 className="font-bold text-slate-400 text-xs uppercase tracking-widest">Category Spend</h3>
-             </div>
-             <div className="h-48 w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                   <Pie 
-                     data={analytics?.categories?.length > 0 ? analytics.categories : [{name: "No Data", value: 1}]} 
-                     cx="50%" cy="50%" 
-                     innerRadius={50} outerRadius={75} 
-                     paddingAngle={4} 
-                     dataKey="value" 
-                     stroke="none"
-                   >
-                     {(analytics?.categories?.length > 0 ? analytics.categories : [{name: "No Data", value: 1}]).map((entry, index) => (
-                       <Cell key={`cell-${index}`} fill={analytics?.categories?.length > 0 ? COLORS[index % COLORS.length] : '#e2e8f0'} />
-                     ))}
-                   </Pie>
-                   <Tooltip 
-                     formatter={(value) => `₹${value.toLocaleString()}`} 
-                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                   />
-                 </PieChart>
-               </ResponsiveContainer>
-             </div>
-          </div>
-
-          {/* Bar Chart */}
-          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col">
-             <div className="flex items-center gap-2 mb-6">
-                <BarChart3 size={16} className="text-emerald-500" />
-                <h3 className="font-bold text-slate-400 text-xs uppercase tracking-widest">Payment Rail</h3>
-             </div>
-             <div className="h-48 w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                 <BarChart 
-                   data={analytics?.payment_modes?.length > 0 ? analytics.payment_modes : [{name: "No Data", value: 0}]} 
-                   margin={{ top: 0, right: 0, left: -25, bottom: 0 }}
-                 >
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} dy={10} />
-                   <Tooltip 
-                     cursor={{ fill: '#f8fafc', radius: 8 }} 
-                     formatter={(value) => `₹${value.toLocaleString()}`} 
-                     contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
-                   />
-                   <Bar dataKey="value" fill="#1e293b" radius={[6, 6, 6, 6]} maxBarSize={40} />
-                 </BarChart>
-               </ResponsiveContainer>
-             </div>
-          </div>
-        </div>
-
-        {/* 3. Recent Activity */}
-        <div className="pt-2">
-          <div className="flex justify-between items-center mb-6 px-2">
-            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              <Activity size={20} className="text-slate-400" /> Recent Ledger
-            </h3>
-            <button onClick={onViewLedger} className="text-xs font-black text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors bg-blue-50 px-4 py-2 rounded-full">
-              View All <ArrowRight size={14} />
-            </button>
-          </div>
-          <div className="bg-white/60 backdrop-blur-sm rounded-[2.5rem] p-3 border border-white shadow-sm space-y-2">
-            {recentTransactions.length > 0 ? (
-              recentTransactions.slice(0, 4).map((tx) => (
-                <div key={tx.id} className="flex items-center justify-between p-4 hover:bg-white rounded-[2rem] transition-all border border-transparent hover:border-slate-100 group cursor-pointer">
+          <div className="space-y-4">
+            {recentTransactions && recentTransactions.length > 0 ? (
+              recentTransactions.map((tx) => (
+                <div key={tx.id} className="flex justify-between items-center p-4 rounded-2xl bg-black/5 dark:bg-white/5">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-lg shadow-inner ${tx.type === 'credit' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      {tx.type === 'credit' ? '+' : '-'}
-                    </div>
+                    <div className={`w-2 h-10 rounded-full ${tx.type === 'credit' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                     <div>
-                      <p className="font-bold text-slate-900 text-md">{tx.title}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{tx.category}</p>
+                      <p className="font-black text-sm">{tx.title}</p>
+                      <p className="text-[10px] font-bold opacity-40 uppercase">{tx.category} • {tx.payment_method}</p>
                     </div>
                   </div>
-                  <span className={`font-black text-lg ${tx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'}`}>
-                    ₹{tx.amount.toLocaleString()}
-                  </span>
+                  <p className={`font-black ${tx.type === 'credit' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {tx.type === 'credit' ? '+' : '-'}₹{tx.amount.toLocaleString()}
+                  </p>
                 </div>
               ))
             ) : (
-              <p className="p-10 text-center text-slate-400 font-bold">No transactions found for this period.</p>
+              <p className="text-center py-10 font-bold opacity-30 italic">No missions recorded this month.</p>
             )}
           </div>
         </div>
 
-      </div>
-
-      {/* =========================================
-          RIGHT COLUMN: Action Center (Spans 4/12)
-          ========================================= */}
-      <div className="xl:col-span-4 space-y-4">
-        
-        {/* Total Debits Highlight */}
-        <div className="bg-[#1e293b] text-white p-8 md:p-10 rounded-[3rem] shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-3 relative z-10">Total Monthly Debits</p>
-          <h3 className="text-5xl md:text-6xl font-black tracking-tighter relative z-10 break-words">
-            ₹{stats.total_out?.toLocaleString() || "0"}
-          </h3>
-        </div>
-
-        {/* Total Income */}
-        <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex justify-between items-center gap-4">
-          <div className="min-w-0">
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-2">Total Money In</p>
-            <h3 className="text-3xl font-black text-slate-900 truncate">
-              ₹{stats.total_in?.toLocaleString() || "0"}
-            </h3>
+        {/* PENDING RECOVERIES ALERTS */}
+        <div className={cardClass}>
+          <div className="flex items-center gap-2 mb-8 text-rose-500">
+            <AlertCircle size={24} />
+            <h3 className="text-xl font-black uppercase tracking-tight">Active Recoveries</h3>
           </div>
-          <div className="h-12 w-12 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center shrink-0">
-             <Plus size={24} />
-          </div>
-        </div>
-
-        {/* Quick Actions Array */}
-        <div className="grid grid-cols-2 gap-4 pt-2">
-          <button onClick={onAddExpense} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-6 rounded-[2rem] font-black flex flex-col items-center justify-center gap-3 transition-all active:scale-95 border border-rose-100">
-            <div className="bg-white rounded-full p-2 shadow-sm"><Minus size={20} /></div>
-            <span className="text-xs tracking-wide">Add Expense</span>
-          </button>
           
-          <button onClick={onAddCredit} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 p-6 rounded-[2rem] font-black flex flex-col items-center justify-center gap-3 transition-all active:scale-95 border border-emerald-100">
-            <div className="bg-white rounded-full p-2 shadow-sm"><Plus size={20} /></div>
-            <span className="text-xs tracking-wide">Add Income</span>
-          </button>
+          <div className="space-y-4">
+            {pendingRecoveries && pendingRecoveries.length > 0 ? (
+              pendingRecoveries.map((tx) => (
+                <div key={tx.id} className="p-5 rounded-[2rem] border-2 border-rose-500/20 bg-rose-500/5 flex justify-between items-center">
+                  <div>
+                    <p className="font-black text-sm">{tx.title}</p>
+                    <p className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Expected: {tx.expected_recovery_date}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-black text-rose-600">₹{tx.amount.toLocaleString()}</p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10">
+                <p className="font-bold opacity-30 italic">All debts collected. You are in the green.</p>
+              </div>
+            )}
+          </div>
         </div>
-
       </div>
     </div>
   );
