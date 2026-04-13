@@ -207,7 +207,7 @@ export default function Dashboard({
           
           <button onClick={onAddCredit} className="bg-emerald-50 hover:bg-emerald-100 text-emerald-600 p-6 rounded-[2rem] font-black flex flex-col items-center justify-center gap-3 transition-all active:scale-95 border border-emerald-100">
             <div className="bg-white rounded-full p-2 shadow-sm"><Plus size={20} /></div>
-            <span className="text-xs tracking-wide">Add Credit</span>
+            <span className="text-xs tracking-wide">Add Income</span>
           </button>
         </div>
 

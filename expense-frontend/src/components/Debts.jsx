@@ -1,8 +1,8 @@
 import { Landmark, ArrowUpRight } from 'lucide-react';
 
 export default function Debts({ transactions }) {
-  // 1. Base Debt
-  const INITIAL_DEBT = 20000;
+  // 1. Base Debt - Set to 0 so no "ghost" numbers appear
+  const INITIAL_DEBT = 0;
 
   // 2. Calculate DEBT PAID (Debits marked as debt)
   const totalPaid = transactions
@@ -45,7 +45,9 @@ export default function Debts({ transactions }) {
             <h4 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Total Liabilities</h4>
             
             <div className="flex items-center gap-4 mb-8">
-               <p className="text-slate-400 font-black tracking-widest uppercase text-[10px]">Base Debt: ₹{INITIAL_DEBT.toLocaleString()}</p>
+               <p className="text-slate-400 font-black tracking-widest uppercase text-[10px]">
+                 Base Debt: ₹{INITIAL_DEBT.toLocaleString()}
+               </p>
                {newDebtTaken > 0 && (
                  <p className="text-rose-400 font-black tracking-widest uppercase text-[10px] flex items-center gap-1">
                    <ArrowUpRight size={12} /> +₹{newDebtTaken.toLocaleString()} Borrowed
