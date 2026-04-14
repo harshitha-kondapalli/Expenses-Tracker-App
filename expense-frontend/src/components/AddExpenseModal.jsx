@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Loader2, Sparkles, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, API_BASE, accounts = [], prefill = null }) {
+export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, API_BASE, accounts = [], prefill = null, budgets = [], analytics = { categories: [] } }) {
   const [formData, setFormData] = useState({
     title: prefill?.title || '',
     amount: prefill?.amount || '',
@@ -156,15 +156,16 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
     }
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) return toast.error("Merchant and Amount are required");
     
     setIsSubmitting(true);
     try {
+      const expenseAmount = parseFloat(formData.amount);
       const payload = { 
         ...formData, 
-        amount: parseFloat(formData.amount), 
+        amount: expenseAmount, 
         user_id: user?.id, 
         goal_id: formData.category === "Goals" ? selectedGoalId : null,
         account_id: formData.account_id || null,
@@ -181,15 +182,52 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
         await fetch(`${API_BASE}/goals/${selectedGoalId}/add`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', 'X-User-ID': user?.id },
-          body: JSON.stringify({ amount_to_add: parseFloat(formData.amount) })
+          body: JSON.stringify({ amount_to_add: expenseAmount })
         });
       }
 
-      toast.success("Recorded!");
+      // ==========================================
+      // THE IMPACT WARNING LOGIC
+      // ==========================================
+      // 1. Find if there is a budget limit for this exact category
+      const targetBudget = budgets.find(b => b.category.toLowerCase() === formData.category.toLowerCase());
+      
+      if (targetBudget && res.ok) {
+        // 2. Find how much was already spent BEFORE this transaction
+        const previousSpend = analytics?.categories?.find(
+          c => c?.category && c.category.toLowerCase() === formData.category.toLowerCase()
+        )?.total || 0;
+        
+        // 3. Calculate the new total
+        const newTotal = previousSpend + expenseAmount;
+
+        // 4. Check for breach
+        if (newTotal > targetBudget.monthly_limit) {
+          const overage = newTotal - targetBudget.monthly_limit;
+          toast.error(
+            `Budget Breached! You are ₹${overage.toLocaleString()} over your ${targetBudget.category} limit.`, 
+            { duration: 6000, icon: '🚨' }
+          );
+        } else if (newTotal > (targetBudget.monthly_limit * 0.85)) {
+          // Warning for getting close (85%)
+          toast.success(
+            `Warning: You only have ₹${(targetBudget.monthly_limit - newTotal).toLocaleString()} left in ${targetBudget.category}.`, 
+            { duration: 5000, icon: '⚠️', style: { border: '1px solid #f59e0b', color: '#b45309' } }
+          );
+        } else {
+          toast.success("Expense recorded securely!");
+        }
+      } else if (res.ok) {
+        toast.success("Expense recorded securely!");
+      }
+
       onSuccess();
       onClose();
-    } catch (err) { toast.error("Failed to save"); }
-    finally { setIsSubmitting(false); }
+    } catch (err) { 
+      toast.error("Failed to save"); 
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   const inputClass = `w-full px-4 py-3 rounded-xl border transition-all outline-none text-sm font-medium ${darkMode ? 'bg-slate-800 border-slate-700 focus:border-rose-500 text-white' : 'bg-white border-slate-200 focus:border-rose-500 text-slate-900'}`;

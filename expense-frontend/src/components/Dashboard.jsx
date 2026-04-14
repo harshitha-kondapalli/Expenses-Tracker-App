@@ -11,6 +11,7 @@ import {
   Calculator, // NEW IMPORT
   Equal       // NEW IMPORT
 } from 'lucide-react';
+import BudgetGauges from './BudgetGauges';
 
 // ==========================================
 // 1. QUICK MATH COMPONENT (Built right here!)
@@ -67,6 +68,7 @@ function QuickMathCard({ darkMode }) {
 // 2. MAIN DASHBOARD COMPONENT
 // ==========================================
 export default function Dashboard({ 
+  transactions,
   onAddWithScreenshot, 
   recentTransactions, 
   pendingRecoveries, 
@@ -79,7 +81,9 @@ export default function Dashboard({
   onAddExpense, 
   onAddCredit, 
   onViewLedger, 
-  darkMode 
+  darkMode,
+  budgets,       // <--- ADD THIS
+  onSetBudget 
 }) {
 
   const months = [
@@ -234,6 +238,14 @@ export default function Dashboard({
               )}
             </div>
           </div>
+
+              <BudgetGauges 
+                budgets={budgets} 
+                transactions={transactions}
+                analytics={analytics} 
+                onSetBudget={onSetBudget} // Assuming you passed setActiveModal down, or trigger it via a prop
+                darkMode={darkMode} 
+              />
 
           {/* QUICK MATH COMPONENT PLACED HERE */}
           <QuickMathCard darkMode={darkMode} />

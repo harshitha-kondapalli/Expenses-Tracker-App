@@ -15,6 +15,7 @@ import FeatureAnnouncement from './components/FeatureAnnouncement';
 import UserProfilePane from './components/UserProfilePane';
 import AddLoanModal from './components/AddLoanModal';
 import EMICalculatorModal from './components/EMICalculatorModal'; // NEW
+import SetBudgetModal from './components/SetBudgetModal';
 import { Toaster } from 'react-hot-toast';
 import toast from 'react-hot-toast';
 import { Moon, Sun, LogOut } from 'lucide-react';
@@ -38,6 +39,8 @@ function MainApp() {
   const [filterYear, setFilterYear] = useState(new Date().getFullYear());
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const [budgets, setBudgets] = useState([]);
 
 const handleAddWithScreenshot = async (file) => {
   const loadingToast = toast.loading("AI Vision reading screenshot...");
@@ -90,6 +93,10 @@ const handleAddWithScreenshot = async (file) => {
       const accRes = await fetch(`${API_BASE}/accounts`, { headers: getHeaders() });
       const accData = await accRes.json();
       setAccounts(Array.isArray(accData) ? accData : []);
+
+      const budgetRes = await fetch(`${API_BASE}/budgets`, { headers: getHeaders() });
+      const budgetData = await budgetRes.json();
+      setBudgets(Array.isArray(budgetData) ? budgetData : []);
     } catch (err) { 
       console.error("Data Fetch Error:", err); 
     }
@@ -154,25 +161,32 @@ const handleAddWithScreenshot = async (file) => {
         user={{ name: user.user_metadata?.first_name ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ''}`.trim() : (user.email?.split('@')[0] || 'Pilot') }} 
         darkMode={darkMode}
         onOpenProfile={() => setIsProfileOpen(true)} 
+        accounts={accounts}
       />
 
       <main className="max-w-7xl mx-auto mt-6">
         <FeatureAnnouncement darkMode={darkMode} />
         
         {currentTab === 'Dashboard' && (
-          <Dashboard 
-            onAddWithScreenshot={handleAddWithScreenshot}
-            recentTransactions={transactions.slice(0, 5)} 
-            pendingRecoveries={pendingRecoveries} 
-            stats={stats} analytics={analytics} 
-            filterMonth={filterMonth} setFilterMonth={setFilterMonth} 
-            filterYear={filterYear} setFilterYear={setFilterYear} 
-            onAddExpense={() => setActiveModal({ type: 'debit' })} // Changed to object
-            onAddCredit={() => setActiveModal({ type: 'credit' })} // Changed to object
-            onViewLedger={() => setCurrentTab('Transactions')} 
-            darkMode={darkMode} 
-          />
-        )}
+  <Dashboard 
+    transactions={transactions} // <--- ADD THIS LINE
+    onAddWithScreenshot={handleAddWithScreenshot}
+    recentTransactions={transactions.slice(0, 5)} 
+    pendingRecoveries={pendingRecoveries} 
+    stats={stats} 
+    analytics={analytics} 
+    filterMonth={filterMonth} 
+    setFilterMonth={setFilterMonth} 
+    filterYear={filterYear} 
+    setFilterYear={setFilterYear} 
+    onAddExpense={() => setActiveModal({ type: 'debit' })} 
+    onAddCredit={() => setActiveModal({ type: 'credit' })} 
+    onViewLedger={() => setCurrentTab('Transactions')} 
+    darkMode={darkMode} 
+    budgets={budgets}
+    onSetBudget={() => setActiveModal({ type: 'budget' })}
+  />
+)}
         {currentTab === 'Transactions' && (
           <Transactions transactions={filteredTransactions} searchQuery={searchQuery} setSearchQuery={setSearchQuery} onDelete={async (id) => { await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE', headers: getHeaders() }); fetchData(); }} darkMode={darkMode} />
         )}
@@ -208,6 +222,8 @@ const handleAddWithScreenshot = async (file) => {
           darkMode={darkMode} 
           API_BASE={API_BASE} 
           accounts={accounts} 
+          budgets={budgets}     // <--- ADD THIS
+          analytics={analytics}
         />
       )}
       
@@ -223,8 +239,12 @@ const handleAddWithScreenshot = async (file) => {
       )}
 
       {activeModal?.type === 'calculator' && (
-  <EMICalculatorModal onClose={() => setActiveModal(null)} darkMode={darkMode} />
-)}
+      <EMICalculatorModal onClose={() => setActiveModal(null)} darkMode={darkMode} />
+      )}
+
+      {activeModal?.type === 'budget' && (
+      <SetBudgetModal user={user} onClose={() => setActiveModal(null)} onSuccess={fetchData} darkMode={darkMode} API_BASE={API_BASE} />
+      )}
 
     </div>
   );
