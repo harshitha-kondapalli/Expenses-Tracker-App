@@ -1,4 +1,4 @@
-import { LayoutDashboard, ReceiptText, Landmark, Undo2, Target, Vault, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, ReceiptText, Landmark, Undo2, Target, Vault, CreditCard, Sun, Moon } from 'lucide-react';
 
 export default function Navbar({ currentTab, setCurrentTab, user, darkMode, setDarkMode, onOpenProfile }) {
   const tabs = [
@@ -7,7 +7,8 @@ export default function Navbar({ currentTab, setCurrentTab, user, darkMode, setD
     { name: 'Debts', icon: <Landmark size={18} /> },
     { name: 'Recoveries', icon: <Undo2 size={18} /> },
     { name: 'Goals', icon: <Target size={18} /> },
-    { name: 'Savings', icon: <Vault size={18} /> }
+    { name: 'Savings', icon: <Vault size={18} /> },
+    { name: 'Cards', icon: <CreditCard size={18} /> }
   ];
 
   return (

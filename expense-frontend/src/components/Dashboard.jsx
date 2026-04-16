@@ -9,7 +9,8 @@ import {
   Sparkles, 
   AlertCircle,
   Calculator, // NEW IMPORT
-  Equal       // NEW IMPORT
+  Equal,       // NEW IMPORT
+  CreditCard   // NEW IMPORT
 } from 'lucide-react';
 import BudgetGauges from './BudgetGauges';
 
@@ -81,9 +82,12 @@ export default function Dashboard({
   onAddExpense, 
   onAddCredit, 
   onViewLedger, 
+  onViewCards,
   darkMode,
   budgets,       // <--- ADD THIS
-  onSetBudget 
+  onSetBudget,
+  accounts,
+  totalCCDebt
 }) {
 
   const months = [
@@ -171,6 +175,21 @@ export default function Dashboard({
           </div>
           <p className="text-[10px] font-black uppercase opacity-40 tracking-widest mb-1">Total Spent</p>
           <h4 className="text-3xl font-black">₹{stats.total_out?.toLocaleString() || 0}</h4>
+        </div>
+
+        {/* CREDIT CARDS SUMMARY */}
+        <div className={cardClass}>
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-2xl">
+              <CreditCard size={24} />
+            </div>
+            <button onClick={onViewCards} className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Manage</button>
+          </div>
+          <p className="text-[10px] font-black uppercase opacity-40 tracking-widest mb-1">CC Bills</p>
+          <h4 className="text-3xl font-black">₹{totalCCDebt?.toLocaleString() || 0}</h4>
+          <p className="mt-2 text-[10px] font-bold uppercase tracking-widest opacity-50">
+            {accounts.filter(a => a.type === 'card').length} Cards
+          </p>
         </div>
       </div>
 

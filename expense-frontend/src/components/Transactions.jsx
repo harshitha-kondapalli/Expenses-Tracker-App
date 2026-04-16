@@ -1,4 +1,5 @@
-import { Search, Trash2, Edit3, Download, Filter, Receipt } from 'lucide-react';
+import { Search, Trash2, Edit3, Download, Filter, Receipt, ArrowRightLeft } from 'lucide-react';
+import { formatStoredDate } from '../utils';
 
 export default function Transactions({ 
   transactions, 
@@ -8,12 +9,17 @@ export default function Transactions({
   onEdit, 
   darkMode 
 }) {
+  const sortedTransactions = [...transactions].sort((a, b) => {
+    const aDate = a.date || a.created_at || '';
+    const bDate = b.date || b.created_at || '';
+    return bDate.localeCompare(aDate);
+  });
 
   // Function to Export Ledger to CSV
   const exportToCSV = () => {
     const headers = ["Date", "Title", "Type", "Amount", "Category", "Mode"];
-    const rows = transactions.map(tx => [
-      new Date(tx.created_at).toLocaleDateString(),
+    const rows = sortedTransactions.map(tx => [
+      tx.date || '',
       tx.title,
       tx.type,
       tx.amount,
@@ -81,8 +87,8 @@ export default function Transactions({
 
       {/* Transactions List */}
       <div className="space-y-3 px-2">
-        {transactions.length > 0 ? (
-          transactions.map((tx) => (
+        {sortedTransactions.length > 0 ? (
+          sortedTransactions.map((tx) => (
             <div 
               key={tx.id} 
               className={`group p-5 md:p-6 rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all border ${
@@ -94,11 +100,17 @@ export default function Transactions({
               <div className="flex items-center gap-5">
                 {/* Transaction Icon */}
                 <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner shrink-0 ${
-                  tx.type === 'credit' 
-                  ? 'bg-emerald-500/10 text-emerald-500' 
-                  : 'bg-rose-500/10 text-rose-500'
+                  tx.type === 'credit'
+                  ? 'bg-emerald-500/10 text-emerald-500'
+                  : tx.type === 'transfer'
+                    ? 'bg-blue-500/10 text-blue-500'
+                    : 'bg-rose-500/10 text-rose-500'
                 }`}>
-                  {tx.type === 'credit' ? <Receipt size={24} /> : <Filter size={24} className="rotate-180" />}
+                  {tx.type === 'credit'
+                    ? <Receipt size={24} />
+                    : tx.type === 'transfer'
+                      ? <ArrowRightLeft size={24} />
+                      : <Filter size={24} className="rotate-180" />}
                 </div>
 
                 <div>
@@ -109,10 +121,10 @@ export default function Transactions({
                     <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
                       darkMode ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'
                     }`}>
-                      {tx.category}
+                      {tx.type === 'transfer' ? 'Transfer' : tx.category}
                     </span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {new Date(tx.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatStoredDate(tx.date || tx.created_at)}
                     </span>
                     {tx.is_secret && (
                       <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">
@@ -128,13 +140,15 @@ export default function Transactions({
                 <div className="text-right">
                   <p className={`text-2xl font-black ${
                     tx.type === 'credit' 
-                    ? 'text-emerald-500' 
-                    : (darkMode ? 'text-white' : 'text-slate-900')
+                      ? 'text-emerald-500' 
+                      : tx.type === 'transfer'
+                        ? 'text-blue-500'
+                      : (darkMode ? 'text-white' : 'text-slate-900')
                   }`}>
-                    {tx.type === 'credit' ? '+' : '-'} ₹{tx.amount.toLocaleString()}
+                    {tx.type === 'credit' ? '+' : tx.type === 'transfer' ? '↔' : '-'} ₹{tx.amount.toLocaleString()}
                   </p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
-                    via {tx.payment_mode || 'UPI'}
+                    via {tx.payment_mode || tx.payment_method || 'UPI'}
                   </p>
                 </div>
 

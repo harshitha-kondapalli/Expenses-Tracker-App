@@ -32,3 +32,41 @@ export const parseSmartInput = (inputText) => {
 
   return { amount, category, title };
 };
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+export const getTransactionDateParts = (value) => {
+  if (!value || typeof value !== 'string') return null;
+
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+
+  if (!year || !month || !day) return null;
+
+  return { year, month, day };
+};
+
+export const isTransactionInMonth = (value, month, year) => {
+  const parts = getTransactionDateParts(value);
+  if (!parts) return false;
+
+  return parts.month === Number(month) && parts.year === Number(year);
+};
+
+export const formatStoredDate = (value, options = {}) => {
+  const parts = getTransactionDateParts(value);
+  if (!parts) return '';
+
+  const { day = true, month = 'short', year = true } = options;
+  const formatted = [];
+
+  if (day) formatted.push(String(parts.day));
+  if (month) formatted.push(month === 'numeric' ? String(parts.month).padStart(2, '0') : MONTH_NAMES[parts.month - 1]);
+  if (year) formatted.push(String(parts.year));
+
+  return formatted.join(' ');
+};

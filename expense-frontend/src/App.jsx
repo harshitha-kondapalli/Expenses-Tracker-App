@@ -8,6 +8,7 @@ import Recoveries from './components/Recoveries';
 import Debts from './components/Debts';
 import Savings from './components/Savings';
 import Goals from './components/Goals';
+import CardsPage from './components/CardsPage';
 import AddExpenseModal from './components/AddExpenseModal';
 import AddIncomeModal from './components/AddIncomeModal';
 import AccountSetupModal from './components/AccountSetupModal';
@@ -133,6 +134,21 @@ function MainApp() {
 
   const pendingRecoveries = transactions.filter(t => t.is_recovery && t.type === 'debit' && !t.is_recovered);
 
+  // Calculate total credit card debt
+  const totalCCDebt = accounts
+    .filter(a => a.type === 'card')
+    .reduce((total, card) => {
+      const spent = transactions
+        .filter(t => t.account_id === card.id && t.type === 'debit')
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+        
+      const paidBack = transactions
+        .filter(t => (t.to_account_id === card.id && t.type === 'transfer') || (t.account_id === card.id && t.type === 'credit'))
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+
+      return total + Math.max(0, spent - paidBack);
+    }, 0);
+
   return (
     <div className={`${darkMode ? 'bg-slate-900 text-slate-100' : 'bg-[#f8eee4] text-slate-800'} min-h-screen transition-colors duration-500 p-4 md:p-10 pb-24 font-sans`}>
       
@@ -179,9 +195,12 @@ function MainApp() {
             onAddExpense={() => setActiveModal({ type: 'debit' })} 
             onAddCredit={() => setActiveModal({ type: 'credit' })} 
             onViewLedger={() => setCurrentTab('Transactions')} 
+            onViewCards={() => setCurrentTab('Cards')}
             darkMode={darkMode} 
             budgets={budgets}
             onSetBudget={() => setActiveModal({ type: 'budget' })}
+            accounts={accounts}
+            totalCCDebt={totalCCDebt}
           />
         )}
         
@@ -194,7 +213,13 @@ function MainApp() {
               await fetch(`${API_BASE}/transactions/${id}`, { method: 'DELETE', headers: getHeaders() }); 
               fetchData(); 
             }} 
-            onEdit={(tx) => setActiveModal({ type: tx.type === 'credit' ? 'credit' : 'debit', editData: tx })}
+            onEdit={(tx) => {
+              if (tx.type === 'transfer') {
+                toast('Transfer editing is available from the card payment flow.', { icon: 'ℹ️' });
+                return;
+              }
+              setActiveModal({ type: tx.type === 'credit' ? 'credit' : 'debit', editData: tx });
+            }}
             darkMode={darkMode} 
           />
         )}
@@ -203,6 +228,17 @@ function MainApp() {
         {currentTab === 'Recoveries' && <Recoveries transactions={transactions} onSuccess={fetchData} darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}
         {currentTab === 'Goals' && <Goals darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}
         {currentTab === 'Savings' && <Savings darkMode={darkMode} API_BASE={API_BASE} headers={getHeaders()} />}
+        {currentTab === 'Cards' && (
+          <CardsPage
+            accounts={accounts}
+            transactions={transactions}
+            darkMode={darkMode}
+            user={user}
+            API_BASE={API_BASE}
+            onSuccess={fetchData}
+            onPayBill={(cardId) => setActiveModal({ type: 'transfer', editData: { to_account_id: cardId } })}
+          />
+        )}
 
         {activeModal?.type === 'loan' && (
           <AddLoanModal 
@@ -252,6 +288,18 @@ function MainApp() {
           darkMode={darkMode} 
           API_BASE={API_BASE} 
           accounts={accounts} 
+        />
+      )}
+
+      {activeModal?.type === 'transfer' && (
+        <AddTransferModal
+          user={user}
+          editData={activeModal.editData}
+          onClose={() => setActiveModal(null)}
+          onSuccess={fetchData}
+          darkMode={darkMode}
+          API_BASE={API_BASE}
+          accounts={accounts}
         />
       )}
 

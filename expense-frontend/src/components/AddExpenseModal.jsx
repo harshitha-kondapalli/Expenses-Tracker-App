@@ -12,6 +12,7 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
     category: editData?.category || prefill?.category || 'Food',
     payment_method: editData?.payment_method || prefill?.payment_mode || 'UPI',
     account_id: editData?.account_id || '',
+    to_account_id: editData?.to_account_id || '',
     date: editData?.date || prefill?.date || new Date().toISOString().split('T')[0],
     note: editData?.note || '', 
     is_secret: editData?.is_secret || false,
@@ -27,8 +28,8 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
   const [selectedGoalId, setSelectedGoalId] = useState(editData?.goal_id || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Savings", "Goals", "Other"];
-  const paymentMethods = ["UPI", "Cash", "Card", "Bank Transfer"];
+  const categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Savings", "Goals", "Credit Card Payment", "Other"];
+  const paymentMethods = ["UPI", "Cash", "Card", "Bank Transfer", "NetBanking"];
 
   useEffect(() => {
     const fetchGoals = async () => {
@@ -53,6 +54,20 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
       }));
     }
   }, [prefill, editData]);
+
+  // Auto-select credit card when category is "Credit Card Payment"
+  useEffect(() => {
+    if (formData.category === 'Credit Card Payment' && !formData.to_account_id) {
+      const creditCard = accounts.find(a => a.type === 'card');
+      if (creditCard) {
+        setFormData(prev => ({
+          ...prev,
+          to_account_id: creditCard.id,
+          payment_method: 'UPI' // Default to UPI for credit card bill payments
+        }));
+      }
+    }
+  }, [formData.category, accounts]);
 
   const localPreParse = (text, availableGoals, availableAccounts) => {
     // ... (Your existing localPreParse logic stays exactly the same)
@@ -104,7 +119,8 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
       "Bills": ["wifi", "electricity", "recharge", "airtel", "jio", "rent", "water", "bill"],
       "Shopping": ["amazon", "flipkart", "zara", "myntra", "clothes", "shoes", "mall"],
       "Entertainment": ["netflix", "movie", "spotify", "cinema", "prime", "game"],
-      "Savings": ["sip", "stocks", "fixed deposit", "fd", "gold", "mutual fund", "mf"] 
+      "Savings": ["sip", "stocks", "fixed deposit", "fd", "gold", "mutual fund", "mf"],
+      "Credit Card Payment": ["cc payment", "credit card payment", "card payment", "bill payment", "pay cc", "pay card"]
     };
 
     for (const [cat, keywords] of Object.entries(dictionary)) {
@@ -168,23 +184,43 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.amount) return toast.error("Merchant and Amount are required");
+    const isCardPaymentTransfer = formData.category === 'Credit Card Payment';
+
+    if (isCardPaymentTransfer) {
+      if (!formData.amount || !formData.account_id || !formData.to_account_id) {
+        return toast.error("Select the source bank, target card, and amount");
+      }
+    } else if (!formData.title || !formData.amount) {
+      return toast.error("Merchant and Amount are required");
+    }
     
     setIsSubmitting(true);
     try {
       const expenseAmount = parseFloat(formData.amount);
-      const payload = { 
-        ...formData, 
-        amount: expenseAmount, 
-        user_id: user?.id, 
-        goal_id: formData.category === "Goals" ? selectedGoalId : null,
-        account_id: formData.account_id || null,
-        expected_recovery_date: formData.expected_recovery_date || null
-      };
+      const payload = isCardPaymentTransfer
+        ? {
+            title: `Transfer: ${accounts.find((a) => a.id === formData.account_id)?.name || 'Bank'} → ${accounts.find((a) => a.id === formData.to_account_id)?.name || 'Card'}`,
+            amount: expenseAmount,
+            category: 'CC Payment',
+            payment_method: formData.payment_method,
+            account_id: formData.account_id || null,
+            to_account_id: formData.to_account_id || null,
+            date: formData.date,
+            note: formData.note,
+            type: 'transfer',
+            user_id: user?.id
+          }
+        : { 
+            ...formData, 
+            amount: expenseAmount, 
+            user_id: user?.id, 
+            goal_id: formData.category === "Goals" ? selectedGoalId : null,
+            account_id: formData.account_id || null,
+            expected_recovery_date: formData.expected_recovery_date || null
+          };
 
-      // 👇 3. DYNAMIC URL & METHOD BASED ON editData 👇
-      const method = editData ? 'PUT' : 'POST';
-      const url = editData ? `${API_BASE}/transactions/${editData.id}` : `${API_BASE}/transactions`;
+      const method = editData && !isCardPaymentTransfer ? 'PUT' : 'POST';
+      const url = editData && !isCardPaymentTransfer ? `${API_BASE}/transactions/${editData.id}` : `${API_BASE}/transactions`;
 
       const res = await fetch(url, {
         method: method,
@@ -201,7 +237,7 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
       }
 
       // Impact Warning Logic (Only run if it's a NEW transaction, not an edit)
-      if (!editData) {
+      if (!editData && !isCardPaymentTransfer) {
         const targetBudget = budgets.find(b => b.category.toLowerCase() === formData.category.toLowerCase());
         
         if (targetBudget && res.ok) {
@@ -228,9 +264,11 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
         } else if (res.ok) {
           toast.success("Expense recorded securely!");
         }
-      } else if (res.ok) {
+      } else if (res.ok && !isCardPaymentTransfer) {
         // Simple success for an Edit
         toast.success("Record amended securely!");
+      } else if (res.ok && isCardPaymentTransfer) {
+        toast.success("Card payment recorded!");
       }
 
       onSuccess();
@@ -325,7 +363,11 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
                  onChange={(e) => setFormData({...formData, payment_method: e.target.value, account_id: ''})} 
                  className={inputClass}
                >
-                 {paymentMethods.map(method => <option key={method} value={method}>{method}</option>)}
+                 {/* For Credit Card Payment category, only show UPI and NetBanking */}
+                 {formData.category === 'Credit Card Payment' 
+                   ? ['UPI', 'NetBanking'].map(method => <option key={method} value={method}>{method}</option>)
+                   : paymentMethods.map(method => <option key={method} value={method}>{method}</option>)
+                 }
                </select>
             </div>
             <div className="flex-1">
@@ -340,7 +382,8 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
           </div>
 
           {/* Account Selectors */}
-          {(formData.payment_method !== 'Card') && accounts.filter(a => a.type === 'bank').length > 0 && (
+          {/* Bank selector - shown when payment method is not Card AND category is not Credit Card Payment */}
+          {((formData.payment_method !== 'Card' && formData.category !== 'Credit Card Payment') && accounts.filter(a => a.type === 'bank').length > 0) && (
             <div className="animate-in slide-in-from-top-2">
               <label className={labelClass}>Paid From Bank</label>
               <div className="relative">
@@ -359,7 +402,50 @@ export default function AddExpenseModal({ user, onClose, onSuccess, darkMode, AP
             </div>
           )}
 
-          {formData.payment_method === 'Card' && accounts.filter(a => a.type === 'card').length > 0 && (
+          {formData.category === 'Credit Card Payment' && accounts.filter(a => a.type === 'bank').length > 0 && (
+            <div className="animate-in slide-in-from-top-2">
+              <label className={labelClass}>Amount Debited From Bank</label>
+              <div className="relative">
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 opacity-50" size={18} />
+                <select 
+                  value={formData.account_id} 
+                  onChange={(e) => setFormData({...formData, account_id: e.target.value})} 
+                  className={`${inputClass} pl-10`}
+                >
+                  <option value="">Select Bank...</option>
+                  {accounts.filter(a => a.type === 'bank').map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Credit Card Payment Category - Show Card Selector */}
+          {formData.category === 'Credit Card Payment' && accounts.filter(a => a.type === 'card').length > 0 && (
+            <div className="animate-in slide-in-from-top-2">
+              <label className={labelClass}>Amount Credited To Card</label>
+              <div className="relative">
+                <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500 opacity-50" size={18} />
+                <select 
+                  value={formData.to_account_id} 
+                  onChange={(e) => setFormData({...formData, to_account_id: e.target.value})} 
+                  className={`${inputClass} pl-10`}
+                >
+                  <option value="">Select Card...</option>
+                  {accounts.filter(a => a.type === 'card').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-[10px] mt-1.5 font-bold uppercase tracking-wider text-amber-600">
+                Choose which card bill you are paying with UPI or NetBanking
+              </p>
+            </div>
+          )}
+
+          {/* Regular Card Payment Method - Show Card Selector */}
+          {formData.payment_method === 'Card' && formData.category !== 'Credit Card Payment' && accounts.filter(a => a.type === 'card').length > 0 && (
             <div className="animate-in slide-in-from-top-2">
               <label className={labelClass}>Paid With Credit Card</label>
               <div className="relative">
